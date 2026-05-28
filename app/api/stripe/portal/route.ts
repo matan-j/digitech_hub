@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
-import { stripe, appUrl } from '@/lib/stripe';
+import { getStripe, appUrl } from '@/lib/stripe';
 
 export async function POST() {
   const auth = await getCurrentUser();
@@ -13,7 +13,7 @@ export async function POST() {
     return NextResponse.json({ error: 'no_customer' }, { status: 400 });
   }
 
-  const session = await stripe.billingPortal.sessions.create({
+  const session = await getStripe().billingPortal.sessions.create({
     customer: customerId,
     return_url: appUrl('/account'),
   });

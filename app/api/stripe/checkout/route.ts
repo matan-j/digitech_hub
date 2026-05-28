@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
-import { stripe, appUrl } from '@/lib/stripe';
+import { getStripe, appUrl } from '@/lib/stripe';
 
 export async function POST(request: Request) {
   const auth = await getCurrentUser();
@@ -25,7 +25,7 @@ export async function POST(request: Request) {
   // Reuse stripe_customer_id if we already have one, otherwise let Checkout create.
   let customerId = auth.profile.stripe_customer_id ?? undefined;
   if (!customerId) {
-    const customer = await stripe.customers.create({
+    const customer = await getStripe().customers.create({
       email: auth.email,
       metadata: { supabase_user_id: auth.userId },
     });
@@ -37,7 +37,7 @@ export async function POST(request: Request) {
 
   const successPath = `/upgrade/success${returnTo ? `?return=${encodeURIComponent(returnTo)}` : ''}`;
 
-  const session = await stripe.checkout.sessions.create({
+  const session = await getStripe().checkout.sessions.create({
     mode: 'subscription',
     customer: customerId,
     line_items: [{ price: priceId, quantity: 1 }],

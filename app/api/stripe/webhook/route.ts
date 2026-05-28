@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import type Stripe from 'stripe';
-import { stripe } from '@/lib/stripe';
+import { getStripe } from '@/lib/stripe';
 import { createServiceClient } from '@/lib/supabase/server';
 
 export const runtime = 'nodejs';
@@ -59,7 +59,7 @@ export async function POST(request: Request) {
   const body = await request.text();
   let event: Stripe.Event;
   try {
-    event = stripe.webhooks.constructEvent(body, sig, secret);
+    event = getStripe().webhooks.constructEvent(body, sig, secret);
   } catch (err) {
     const message = err instanceof Error ? err.message : 'invalid_signature';
     console.error('[stripe webhook] signature verification failed:', message);
@@ -83,7 +83,7 @@ export async function POST(request: Request) {
         const session = event.data.object as Stripe.Checkout.Session;
         if (session.mode === 'subscription' && session.subscription) {
           const subId = typeof session.subscription === 'string' ? session.subscription : session.subscription.id;
-          const sub = await stripe.subscriptions.retrieve(subId);
+          const sub = await getStripe().subscriptions.retrieve(subId);
           if (session.client_reference_id) {
             sub.metadata = { ...sub.metadata, supabase_user_id: session.client_reference_id };
           }

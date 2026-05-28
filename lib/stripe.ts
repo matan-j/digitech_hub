@@ -1,14 +1,29 @@
 import Stripe from 'stripe';
 
-if (!process.env.STRIPE_SECRET_KEY) {
-  // Allow the module to load (env may not be set in some build contexts), but throw at usage.
-  console.warn('[stripe] STRIPE_SECRET_KEY is not set — Stripe calls will fail');
-}
+let _stripe: Stripe | null = null;
 
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? '', {
-  apiVersion: '2026-04-22.dahlia',
-  typescript: true,
-});
+/**
+ * Lazy Stripe client. Only instantiated when first called — avoids build-time
+ * failures when STRIPE_SECRET_KEY is not yet set on the environment (e.g.
+ * initial production deploy before Stripe is configured).
+ *
+ * Throws at call time if the key is missing — surfaces as a clear runtime error
+ * on /api/stripe/* routes, while leaving the rest of the app buildable.
+ */
+export function getStripe(): Stripe {
+  if (_stripe) return _stripe;
+  const key = process.env.STRIPE_SECRET_KEY;
+  if (!key) {
+    throw new Error(
+      'STRIPE_SECRET_KEY is not set. Configure it in your environment to enable Stripe.',
+    );
+  }
+  _stripe = new Stripe(key, {
+    apiVersion: '2026-04-22.dahlia',
+    typescript: true,
+  });
+  return _stripe;
+}
 
 export function appUrl(path = ''): string {
   const base = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3030';
