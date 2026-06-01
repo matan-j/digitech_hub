@@ -54,7 +54,7 @@ export default async function AdminLoginPage({
 
         <h2 className="text-2xl font-extrabold text-neutral-950 mb-1.5">כניסה</h2>
         <p className="text-sm text-neutral-500 mb-6">
-          הזן את כתובת המייל שלך — נשלח קישור חד-פעמי לכניסה.
+          התחבר עם Google או מייל וסיסמה כדי להגיע ללוח הניהול.
         </p>
 
         <AdminLoginForm returnTo={returnTo} />
