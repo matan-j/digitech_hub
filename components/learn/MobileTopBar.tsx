@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { Menu, X } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import type { AuthState } from '@/lib/auth';
+import LogoutButton from '@/components/auth/LogoutButton';
 
 const NAV = [
   { label: 'דאשבורד', href: '/learn' },
@@ -129,13 +130,9 @@ export default function MobileTopBar({
                   >
                     החשבון שלי
                   </Link>
-                  <Link
-                    href="/logout"
-                    onClick={() => setOpen(false)}
-                    className="block w-full text-center px-3 py-2 rounded-pill border border-brand-purple-200 text-neutral-700 text-sm font-medium"
-                  >
+                  <LogoutButton className="block w-full text-center px-3 py-2 rounded-pill border border-brand-purple-200 text-neutral-700 text-sm font-medium">
                     התנתק
-                  </Link>
+                  </LogoutButton>
                 </>
               ) : (
                 <>

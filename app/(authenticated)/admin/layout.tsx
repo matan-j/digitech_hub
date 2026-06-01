@@ -3,6 +3,7 @@ import { requireAdmin } from '@/lib/auth';
 import { LogOut, ArrowRight } from 'lucide-react';
 import AdminNav from './AdminNavItem';
 import { getBrandLogoUrl } from '@/lib/brand';
+import LogoutButton from '@/components/auth/LogoutButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -45,13 +46,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             <div className="text-[11px] text-neutral-500">מחובר כ-{profile.role === 'admin' ? 'אדמין' : 'משתמש'}</div>
             <div className="text-xs font-medium text-neutral-950 truncate" dir="ltr">{email}</div>
           </div>
-          <Link
-            href="/logout"
-            className="flex items-center justify-center gap-2 w-full px-3 py-2 rounded-pill border border-brand-purple-200 text-neutral-600 text-xs font-medium hover:border-brand-purple-400 hover:text-neutral-950 transition-colors"
-          >
+          <LogoutButton className="flex items-center justify-center gap-2 w-full px-3 py-2 rounded-pill border border-brand-purple-200 text-neutral-600 text-xs font-medium hover:border-brand-purple-400 hover:text-neutral-950 transition-colors">
             <LogOut className="w-3.5 h-3.5" />
             התנתק
-          </Link>
+          </LogoutButton>
         </div>
       </aside>
 

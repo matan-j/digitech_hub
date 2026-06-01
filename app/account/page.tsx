@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { requireUser } from '@/lib/auth';
 import SubscriptionCard from '@/components/account/SubscriptionCard';
+import LogoutButton from '@/components/auth/LogoutButton';
 
 export const metadata = {
   title: 'החשבון שלי — Digitech Learning Hub',
@@ -19,12 +20,9 @@ export default async function AccountPage() {
             </Link>
             <h1 className="text-3xl font-extrabold text-neutral-950 mt-2">החשבון שלי</h1>
           </div>
-          <Link
-            href="/logout"
-            className="text-sm text-neutral-600 hover:text-neutral-900 font-medium"
-          >
+          <LogoutButton className="text-sm text-neutral-600 hover:text-neutral-900 font-medium">
             התנתק
-          </Link>
+          </LogoutButton>
         </div>
 
         <div className="space-y-6">

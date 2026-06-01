@@ -11,6 +11,7 @@ import {
   InstagramIcon, FacebookIcon, LinkedinIcon, YoutubeIcon,
   TiktokIcon, XIcon, WebsiteIcon,
 } from '@/components/icons/social';
+import LogoutButton from '@/components/auth/LogoutButton';
 
 type NavItem = {
   label: string;
@@ -195,13 +196,10 @@ export default function NavSidebar({
                 </span>
               </div>
             </Link>
-            <Link
-              href="/logout"
-              className="flex items-center justify-center gap-2 w-full px-3 py-2 rounded-pill border border-brand-purple-200 hover:border-brand-purple-400 text-neutral-600 hover:text-neutral-950 text-xs font-medium transition-colors"
-            >
+            <LogoutButton className="flex items-center justify-center gap-2 w-full px-3 py-2 rounded-pill border border-brand-purple-200 hover:border-brand-purple-400 text-neutral-600 hover:text-neutral-950 text-xs font-medium transition-colors">
               <LogOut className="w-3.5 h-3.5" />
               התנתק
-            </Link>
+            </LogoutButton>
           </>
         ) : (
           <>
