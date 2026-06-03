@@ -1,20 +1,20 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowRight } from 'lucide-react';
-import { getCourseWithLessons } from '@/lib/learn/db';
+import { getCourseWithModules } from '@/lib/learn/db';
 import CourseEditor from '@/components/learn-admin/CourseEditorV1';
 
 export const dynamic = 'force-dynamic';
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const c = await getCourseWithLessons(slug);
+  const c = await getCourseWithModules(slug);
   return { title: c ? `${c.title} — עריכה` : 'קורס לא נמצא' };
 }
 
 export default async function CourseEditPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const course = await getCourseWithLessons(slug);
+  const course = await getCourseWithModules(slug);
   if (!course) notFound();
 
   return (

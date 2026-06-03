@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
 
-const UPDATABLE = ['title', 'vimeo_id', 'duration', 'body', 'num', 'slug', 'module_id', 'chapter_id'] as const;
+const UPDATABLE = ['title', 'vimeo_id', 'duration', 'body', 'num', 'slug'] as const;
 
 export async function PUT(request: Request, ctx: { params: Promise<{ id: string }> }) {
   await requireAdmin();
@@ -14,20 +14,20 @@ export async function PUT(request: Request, ctx: { params: Promise<{ id: string 
 
   const supabase = await createClient();
   const { data, error } = await supabase
-    .from('lessons')
+    .from('modules')
     .update(update)
     .eq('id', id)
     .select('*')
     .single();
   if (error) return NextResponse.json({ error: 'update_failed', message: error.message }, { status: 500 });
-  return NextResponse.json({ lesson: data });
+  return NextResponse.json({ module: data });
 }
 
 export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string }> }) {
   await requireAdmin();
   const { id } = await ctx.params;
   const supabase = await createClient();
-  const { error } = await supabase.from('lessons').delete().eq('id', id);
+  const { error } = await supabase.from('modules').delete().eq('id', id);
   if (error) return NextResponse.json({ error: 'delete_failed', message: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });
 }

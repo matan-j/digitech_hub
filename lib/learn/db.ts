@@ -1,12 +1,17 @@
 import { createClient } from '@/lib/supabase/server';
 import type {
+  ChapterWithLessons,
   ContentItem,
   ContentType,
   CourseWithLessons,
+  CourseWithModules,
+  DbChapter,
   DbLesson,
+  DbModule,
   DbResource,
   GuideBlock,
   GuideItem,
+  ModuleWithChildren,
   Playbook,
 } from './types';
 
@@ -55,9 +60,9 @@ export async function getContentById(id: string): Promise<ContentItem | null> {
   return data as ContentItem | null;
 }
 
-// ----- Courses (with lessons) -----
+// ----- Courses (with modules → chapters → lessons hierarchy) -----
 
-export async function getCourseWithLessons(slug: string): Promise<CourseWithLessons | null> {
+export async function getCourseWithModules(slug: string): Promise<CourseWithModules | null> {
   const supabase = await db();
   const { data: course, error: cErr } = await supabase
     .from('content_items')
@@ -68,36 +73,145 @@ export async function getCourseWithLessons(slug: string): Promise<CourseWithLess
   if (cErr) throw cErr;
   if (!course) return null;
 
-  const { data: lessons, error: lErr } = await supabase
-    .from('lessons')
-    .select('*')
-    .eq('course_id', course.id)
-    .order('position', { ascending: true });
-  if (lErr) throw lErr;
+  // Fetch modules + lessons in parallel; chapters depend on module ids
+  const [modulesRes, lessonsRes] = await Promise.all([
+    supabase
+      .from('modules')
+      .select('*')
+      .eq('course_id', course.id)
+      .order('position', { ascending: true }),
+    supabase
+      .from('lessons')
+      .select('*')
+      .eq('course_id', course.id)
+      .order('position', { ascending: true }),
+  ]);
+  if (modulesRes.error) throw modulesRes.error;
+  if (lessonsRes.error) throw lessonsRes.error;
 
-  // Fetch lesson-attached resources in a single round-trip
-  const lessonIds = (lessons ?? []).map((l) => l.id);
-  let resourcesByDbLesson: Record<string, DbResource[]> = {};
-  if (lessonIds.length) {
-    const { data: resources, error: rErr } = await supabase
+  const modules = (modulesRes.data ?? []) as DbModule[];
+  const lessons = (lessonsRes.data ?? []) as DbLesson[];
+  const moduleIds = modules.map((m) => m.id);
+
+  // Chapters + all resources in parallel
+  const [chaptersRes, resourcesRes] = await Promise.all([
+    moduleIds.length
+      ? supabase
+          .from('chapters')
+          .select('*')
+          .in('module_id', moduleIds)
+          .order('position', { ascending: true })
+      : Promise.resolve({ data: [] as DbChapter[], error: null }),
+    (async () => {
+      const ids = [
+        ...moduleIds,
+        ...lessons.map((l) => l.id),
+      ];
+      if (!ids.length) return { data: [] as DbResource[], error: null };
+      return supabase.from('resources').select('*').in('owner_id', ids);
+    })(),
+  ]);
+  if (chaptersRes.error) throw chaptersRes.error;
+  if (resourcesRes.error) throw resourcesRes.error;
+
+  const chapters = (chaptersRes.data ?? []) as DbChapter[];
+  const chapterIds = chapters.map((c) => c.id);
+
+  // One additional fetch for chapter-owned resources (we don't know chapter ids until now)
+  let chapterResources: DbResource[] = [];
+  if (chapterIds.length) {
+    const { data, error } = await supabase
       .from('resources')
       .select('*')
-      .eq('owner_type', 'lesson')
-      .in('owner_id', lessonIds);
-    if (rErr) throw rErr;
-    resourcesByDbLesson = (resources ?? []).reduce((acc, r) => {
-      const list = acc[r.owner_id] ?? (acc[r.owner_id] = []);
-      list.push(r as DbResource);
-      return acc;
-    }, {} as Record<string, DbResource[]>);
+      .eq('owner_type', 'chapter')
+      .in('owner_id', chapterIds);
+    if (error) throw error;
+    chapterResources = (data ?? []) as DbResource[];
   }
 
-  const enrichedDbLessons: DbLesson[] = (lessons ?? []).map((l) => ({
-    ...(l as DbLesson),
-    resources: resourcesByDbLesson[l.id] ?? [],
+  const allResources = [...((resourcesRes.data ?? []) as DbResource[]), ...chapterResources];
+
+  // Group resources by owner
+  const resByOwner = new Map<string, DbResource[]>();
+  for (const r of allResources) {
+    const list = resByOwner.get(r.owner_id);
+    if (list) list.push(r);
+    else resByOwner.set(r.owner_id, [r]);
+  }
+
+  // Build chapter → lessons map
+  const lessonsByChapter = new Map<string, DbLesson[]>();
+  const lessonsByModuleDirect = new Map<string, DbLesson[]>(); // chapter_id IS NULL
+  for (const l of lessons) {
+    const enriched: DbLesson = { ...l, resources: resByOwner.get(l.id) ?? [] };
+    if (enriched.chapter_id) {
+      const list = lessonsByChapter.get(enriched.chapter_id);
+      if (list) list.push(enriched);
+      else lessonsByChapter.set(enriched.chapter_id, [enriched]);
+    } else {
+      const list = lessonsByModuleDirect.get(enriched.module_id);
+      if (list) list.push(enriched);
+      else lessonsByModuleDirect.set(enriched.module_id, [enriched]);
+    }
+  }
+
+  // Build module → chapters map
+  const chaptersByModule = new Map<string, ChapterWithLessons[]>();
+  for (const c of chapters) {
+    const enriched: ChapterWithLessons = {
+      ...c,
+      resources: resByOwner.get(c.id) ?? [],
+      lessons: lessonsByChapter.get(c.id) ?? [],
+    };
+    const list = chaptersByModule.get(c.module_id);
+    if (list) list.push(enriched);
+    else chaptersByModule.set(c.module_id, [enriched]);
+  }
+
+  const enrichedModules: ModuleWithChildren[] = modules.map((m) => ({
+    ...m,
+    resources: resByOwner.get(m.id) ?? [],
+    chapters: chaptersByModule.get(m.id) ?? [],
+    lessons: lessonsByModuleDirect.get(m.id) ?? [],
   }));
 
-  return { ...(course as ContentItem), type: 'course', lessons: enrichedDbLessons };
+  return { ...(course as ContentItem), type: 'course', modules: enrichedModules };
+}
+
+/**
+ * @deprecated Use {@link getCourseWithModules}. Kept as a flat-lesson shim for legacy callers
+ * (bulk-import, playbooks-from-course, courses.ts mapper). Flattens modules → chapters → lessons
+ * in position order.
+ */
+export async function getCourseWithLessons(slug: string): Promise<CourseWithLessons | null> {
+  const course = await getCourseWithModules(slug);
+  if (!course) return null;
+
+  const flat: DbLesson[] = [];
+  for (const m of course.modules) {
+    for (const c of m.chapters) {
+      for (const l of c.lessons) flat.push(l);
+    }
+    for (const l of m.lessons) flat.push(l);
+  }
+  // Restore the legacy CourseWithLessons shape (no `modules` field)
+  const { modules: _modules, ...courseBase } = course;
+  void _modules;
+  return { ...(courseBase as ContentItem), type: 'course', lessons: flat };
+}
+
+export async function getDbModuleById(id: string): Promise<DbModule | null> {
+  const supabase = await db();
+  const { data, error } = await supabase.from('modules').select('*').eq('id', id).maybeSingle();
+  if (error) throw error;
+  return (data as DbModule) ?? null;
+}
+
+export async function getDbChapterById(id: string): Promise<DbChapter | null> {
+  const supabase = await db();
+  const { data, error } = await supabase.from('chapters').select('*').eq('id', id).maybeSingle();
+  if (error) throw error;
+  return (data as DbChapter) ?? null;
 }
 
 export async function getDbLessonById(lessonId: string): Promise<DbLesson | null> {

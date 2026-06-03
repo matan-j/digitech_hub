@@ -30,22 +30,62 @@ export async function POST(request: Request, ctx: { params: Promise<{ slug: stri
     .maybeSingle();
   if (cErr || !course) return NextResponse.json({ error: 'course_not_found' }, { status: 404 });
 
-  // Determine next num + position
-  const { data: existing } = await supabase
+  // Resolve target module: explicit > first module in course (back-compat for bulk-import).
+  let moduleId: string | null = (body.module_id ?? null) as string | null;
+  if (!moduleId) {
+    const { data: firstModule } = await supabase
+      .from('modules')
+      .select('id')
+      .eq('course_id', course.id)
+      .order('position', { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    moduleId = firstModule?.id ?? null;
+  }
+  if (!moduleId) {
+    return NextResponse.json(
+      { error: 'no_module', message: 'הקורס לא מכיל מודולים. צור מודול לפני הוספת שיעור.' },
+      { status: 400 }
+    );
+  }
+
+  // Validate chapter (if provided) belongs to the resolved module
+  const chapterId: string | null = (body.chapter_id ?? null) as string | null;
+  if (chapterId) {
+    const { data: chap } = await supabase
+      .from('chapters')
+      .select('id, module_id')
+      .eq('id', chapterId)
+      .maybeSingle();
+    if (!chap || chap.module_id !== moduleId) {
+      return NextResponse.json({ error: 'chapter_not_in_module' }, { status: 400 });
+    }
+  }
+
+  // Determine next num + position scoped to the resolved container (module or chapter).
+  // Slug uniqueness is enforced at the course level (routing key) AND at the module level.
+  const { data: courseLessons } = await supabase
     .from('lessons')
-    .select('num, position, slug')
+    .select('slug')
     .eq('course_id', course.id);
-  const used = new Set((existing ?? []).map((l) => l.slug));
-  const nextNum = ((existing ?? []).reduce((m, l) => Math.max(m, l.num), 0)) + 1;
-  const nextPos = ((existing ?? []).reduce((m, l) => Math.max(m, l.position), -1)) + 1;
+  const usedInCourse = new Set((courseLessons ?? []).map((l) => l.slug));
+
+  const scopeQuery = supabase.from('lessons').select('num, position').eq('module_id', moduleId);
+  const { data: scope } = chapterId
+    ? await scopeQuery.eq('chapter_id', chapterId)
+    : await scopeQuery.is('chapter_id', null);
+  const nextNum = (scope ?? []).reduce((m, l) => Math.max(m, l.num), 0) + 1;
+  const nextPos = (scope ?? []).reduce((m, l) => Math.max(m, l.position), -1) + 1;
 
   let candidate = slugify(title, `lesson-${nextNum}`);
-  for (let i = 2; used.has(candidate) && i < 50; i++) candidate = `${candidate}-${i}`;
+  for (let i = 2; usedInCourse.has(candidate) && i < 50; i++) candidate = `${slugify(title, `lesson-${nextNum}`)}-${i}`;
 
   const { data: lesson, error } = await supabase
     .from('lessons')
     .insert({
       course_id: course.id,
+      module_id: moduleId,
+      chapter_id: chapterId,
       num: nextNum,
       slug: candidate,
       title,

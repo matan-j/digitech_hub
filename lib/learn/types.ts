@@ -54,6 +54,8 @@ export type DbResource = {
 export type DbLesson = {
   id: string;
   course_id: string;
+  module_id: string;
+  chapter_id: string | null;
   num: number;
   slug: string;
   title: string;
@@ -62,6 +64,39 @@ export type DbLesson = {
   body: string | null;
   position: number;
   resources?: DbResource[];
+};
+
+export type DbModule = {
+  id: string;
+  course_id: string;
+  num: number;
+  slug: string;
+  title: string;
+  vimeo_id: string | null;
+  duration: string | null;
+  body: string | null;
+  position: number;
+  resources?: DbResource[];
+};
+
+export type DbChapter = {
+  id: string;
+  module_id: string;
+  num: number;
+  slug: string;
+  title: string;
+  vimeo_id: string | null;
+  duration: string | null;
+  body: string | null;
+  position: number;
+  resources?: DbResource[];
+};
+
+export type ChapterWithLessons = DbChapter & { lessons: DbLesson[] };
+
+export type ModuleWithChildren = DbModule & {
+  chapters: ChapterWithLessons[];
+  lessons: DbLesson[]; // lessons whose chapter_id IS NULL (hang directly under module)
 };
 
 export type GuideBlock =
@@ -90,9 +125,15 @@ export type ContentItem = {
   updated_at: string;
 };
 
+/** @deprecated use CourseWithModules for new code; this stays for legacy callers (bulk-import, playbooks, courses.ts shim). */
 export type CourseWithLessons = ContentItem & {
   type: 'course';
   lessons: DbLesson[];
+};
+
+export type CourseWithModules = ContentItem & {
+  type: 'course';
+  modules: ModuleWithChildren[];
 };
 
 export type GuideItem = ContentItem & {
