@@ -13,6 +13,45 @@ export async function PUT(request: Request, ctx: { params: Promise<{ id: string 
   if (!Object.keys(update).length) return NextResponse.json({ error: 'nothing_to_update' }, { status: 400 });
 
   const supabase = await createClient();
+
+  // If admin is reparenting (module_id or chapter_id changes), append the lesson at
+  // the END of the new container — compute next position/num so it doesn't collide
+  // with whatever's already there.
+  const parentChanging = 'module_id' in update || 'chapter_id' in update;
+  if (parentChanging) {
+    const { data: current } = await supabase
+      .from('lessons')
+      .select('module_id, chapter_id, course_id')
+      .eq('id', id)
+      .maybeSingle();
+    if (!current) {
+      return NextResponse.json({ error: 'lesson_not_found' }, { status: 404 });
+    }
+    const targetModuleId = ('module_id' in update ? (update.module_id as string | null) : current.module_id) as string;
+    const targetChapterId = ('chapter_id' in update ? (update.chapter_id as string | null) : (current.chapter_id as string | null));
+
+    // Validate the target chapter (if provided) belongs to the target module
+    if (targetChapterId) {
+      const { data: chap } = await supabase.from('chapters').select('module_id').eq('id', targetChapterId).maybeSingle();
+      if (!chap || chap.module_id !== targetModuleId) {
+        return NextResponse.json({ error: 'chapter_not_in_module' }, { status: 400 });
+      }
+    }
+
+    const scopeQuery = supabase
+      .from('lessons')
+      .select('num, position')
+      .eq('module_id', targetModuleId)
+      .neq('id', id);
+    const { data: scope } = targetChapterId
+      ? await scopeQuery.eq('chapter_id', targetChapterId)
+      : await scopeQuery.is('chapter_id', null);
+    const nextNum = (scope ?? []).reduce((m, l) => Math.max(m, l.num), 0) + 1;
+    const nextPos = (scope ?? []).reduce((m, l) => Math.max(m, l.position), -1) + 1;
+    update.num = nextNum;
+    update.position = nextPos;
+  }
+
   const { data, error } = await supabase
     .from('lessons')
     .update(update)

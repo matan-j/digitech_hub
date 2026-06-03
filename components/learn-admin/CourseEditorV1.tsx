@@ -7,7 +7,7 @@ import { Trash2, ExternalLink, Plus, FileSpreadsheet, FolderPlus, BookPlus } fro
 import FileUpload from './FileUpload';
 import SaveIndicator, { type SaveState } from './SaveIndicator';
 import GeneratePlaybookButton from './GeneratePlaybookButton';
-import NodeEditor from './NodeEditor';
+import NodeEditor, { type MoveTarget } from './NodeEditor';
 import type {
   ChapterWithLessons,
   CourseWithModules,
@@ -299,6 +299,95 @@ export default function CourseEditorV1({ initial }: Props) {
   }
 
   // ============================================================
+  // Move a lesson across containers (different module / chapter)
+  // ============================================================
+  async function moveLesson(
+    lessonId: string,
+    from: { moduleId: string; chapterId: string | null },
+    to: { moduleId: string; chapterId: string | null },
+  ) {
+    if (from.moduleId === to.moduleId && from.chapterId === to.chapterId) return;
+    // Find the lesson in current state
+    let moved: DbLesson | undefined;
+    setModules((prev) => prev.map((m) => {
+      if (m.id !== from.moduleId) return m;
+      if (from.chapterId === null) {
+        const idx = m.lessons.findIndex((l) => l.id === lessonId);
+        if (idx === -1) return m;
+        moved = m.lessons[idx];
+        return { ...m, lessons: m.lessons.filter((_, i) => i !== idx) };
+      }
+      return {
+        ...m,
+        chapters: m.chapters.map((c) => {
+          if (c.id !== from.chapterId) return c;
+          const idx = c.lessons.findIndex((l) => l.id === lessonId);
+          if (idx === -1) return c;
+          moved = c.lessons[idx];
+          return { ...c, lessons: c.lessons.filter((_, i) => i !== idx) };
+        }),
+      };
+    }));
+    // Defer the "insert into target" pass until React processes the removal,
+    // then re-apply with the moved item — but we can do it in the same pass
+    // by reading the local moved variable after the setState callback.
+    // Simpler: reapply with updated pointers.
+    setModules((prev) => {
+      if (!moved) return prev;
+      const next = { ...moved, module_id: to.moduleId, chapter_id: to.chapterId };
+      return prev.map((m) => {
+        if (m.id !== to.moduleId) return m;
+        if (to.chapterId === null) {
+          return { ...m, lessons: [...m.lessons, next] };
+        }
+        return {
+          ...m,
+          chapters: m.chapters.map((c) => c.id === to.chapterId ? { ...c, lessons: [...c.lessons, next] } : c),
+        };
+      });
+    });
+
+    // Server PUT — server recomputes position/num to "end of new container"
+    const res = await fetch(`/api/lessons/${lessonId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ module_id: to.moduleId, chapter_id: to.chapterId }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      alert('שגיאה בהעברה: ' + (data.message ?? data.error ?? 'unknown'));
+      return;
+    }
+    // Server returns the updated lesson with new num/position — patch it locally
+    const data = await res.json();
+    const updated = data.lesson as DbLesson;
+    setModules((prev) => prev.map((m) => {
+      if (m.id !== to.moduleId) return m;
+      if (to.chapterId === null) {
+        return { ...m, lessons: m.lessons.map((l) => l.id === lessonId ? { ...l, ...updated } : l) };
+      }
+      return {
+        ...m,
+        chapters: m.chapters.map((c) => c.id === to.chapterId
+          ? { ...c, lessons: c.lessons.map((l) => l.id === lessonId ? { ...l, ...updated } : l) }
+          : c,
+        ),
+      };
+    }));
+  }
+
+  const moveTargets: MoveTarget[] = modules.map((m) => ({
+    moduleId: m.id,
+    moduleNum: m.num,
+    moduleTitle: m.title,
+    chapters: m.chapters.map((c) => ({
+      chapterId: c.id,
+      chapterNum: c.num,
+      chapterTitle: c.title,
+    })),
+  }));
+
+  // ============================================================
   // Drag/drop helpers — scoped per container
   // ============================================================
   function onDragStart(scope: DragScope, idx: number) {
@@ -452,6 +541,8 @@ export default function CourseEditorV1({ initial }: Props) {
                 key={mod.id}
                 module={mod}
                 mIdx={mIdx}
+                moveTargets={moveTargets}
+                onLessonMove={moveLesson}
                 onModuleChange={(next) => updateModule(next)}
                 onModuleDelete={() => deleteModule(mod.id)}
                 onChapterChange={(next) => updateChapter(mod.id, next)}
@@ -497,6 +588,8 @@ export default function CourseEditorV1({ initial }: Props) {
 function ModuleBlock({
   module: mod,
   mIdx,
+  moveTargets,
+  onLessonMove,
   onModuleChange,
   onModuleDelete,
   onChapterChange,
@@ -511,6 +604,8 @@ function ModuleBlock({
 }: {
   module: ModuleWithChildren;
   mIdx: number;
+  moveTargets: MoveTarget[];
+  onLessonMove: (lessonId: string, from: { moduleId: string; chapterId: string | null }, to: { moduleId: string; chapterId: string | null }) => void;
   onModuleChange: (next: DbModule) => void;
   onModuleDelete: () => void;
   onChapterChange: (next: DbChapter) => void;
@@ -544,6 +639,8 @@ function ModuleBlock({
                 chapter={chap}
                 cIdx={cIdx}
                 moduleId={mod.id}
+                moveTargets={moveTargets}
+                onLessonMove={onLessonMove}
                 onChapterChange={onChapterChange}
                 onChapterDelete={() => onChapterDelete(chap.id)}
                 onLessonChange={(next) => onLessonChange(chap.id, next)}
@@ -564,6 +661,8 @@ function ModuleBlock({
                 key={l.id}
                 kind="lesson"
                 node={l}
+                availableTargets={moveTargets}
+                onMove={(to) => onLessonMove(l.id, { moduleId: mod.id, chapterId: null }, to)}
                 onChange={(next) => onLessonChange(null, next)}
                 onDelete={() => onLessonDelete(null, l.id)}
                 onDragStart={() => onDragStart({ kind: 'lessons', moduleId: mod.id, chapterId: null }, lIdx)}
@@ -604,6 +703,8 @@ function ChapterBlock({
   chapter,
   cIdx,
   moduleId,
+  moveTargets,
+  onLessonMove,
   onChapterChange,
   onChapterDelete,
   onLessonChange,
@@ -616,6 +717,8 @@ function ChapterBlock({
   chapter: ChapterWithLessons;
   cIdx: number;
   moduleId: string;
+  moveTargets: MoveTarget[];
+  onLessonMove: (lessonId: string, from: { moduleId: string; chapterId: string | null }, to: { moduleId: string; chapterId: string | null }) => void;
   onChapterChange: (next: DbChapter) => void;
   onChapterDelete: () => void;
   onLessonChange: (next: DbLesson) => void;
@@ -644,6 +747,8 @@ function ChapterBlock({
                 key={l.id}
                 kind="lesson"
                 node={l}
+                availableTargets={moveTargets}
+                onMove={(to) => onLessonMove(l.id, { moduleId, chapterId: chapter.id }, to)}
                 onChange={onLessonChange}
                 onDelete={() => onLessonDelete(l.id)}
                 onDragStart={() => onDragStart({ kind: 'lessons', moduleId, chapterId: chapter.id }, lIdx)}
