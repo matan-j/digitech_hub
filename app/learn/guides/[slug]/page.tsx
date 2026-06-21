@@ -1,6 +1,6 @@
 import Link from 'next/link';
-import { notFound, redirect } from 'next/navigation';
-import { ArrowRight, Clock, FileText, ExternalLink, Download, Eye } from 'lucide-react';
+import { notFound } from 'next/navigation';
+import { ArrowRight, Clock, FileText, ExternalLink, Download, Eye, Lock } from 'lucide-react';
 import {
   getGuideWithCreator,
   recordGuideView,
@@ -16,6 +16,7 @@ import { DOMAIN_BY_ID, domainBadgeClasses, domainDotClasses } from '@/lib/learn/
 import { youtubeIdFromUrl, youtubeEmbedUrl } from '@/lib/learn/youtube';
 import { parseVimeoInput } from '@/lib/learn/vimeo';
 import { contentKindLabel } from '@/lib/learn/placeholder';
+import { decideAccess, gateCtaLabel, type GateReason } from '@/lib/learn/access';
 
 export const dynamic = 'force-dynamic';
 
@@ -46,13 +47,15 @@ export default async function GuideReadPage({ params }: { params: Promise<{ slug
     if (!isAdmin && !ownsIt) notFound();
   }
 
-  // Premium gate (published only).
-  if (isPublished && guide.is_premium) {
-    if (!auth) redirect(`/login?return=${encodeURIComponent(`/learn/guides/${slug}`)}`);
-    if (!hasPremiumAccess(auth.profile)) {
-      redirect(`/upgrade?return=${encodeURIComponent(`/learn/guides/${slug}`)}`);
-    }
-  }
+  // Public-first: never redirect on a published guide. Decide whether the
+  // viewer sees the full body, a preview, or just the metadata + a gate CTA.
+  // (For currently-premium guides the row is RLS-hidden until migration 022,
+  // so this path activates once the access-model migrations are applied.)
+  const decision = decideAccess(guide, {
+    loggedIn: !!auth,
+    hasPremium: !!auth && hasPremiumAccess(auth.profile),
+  });
+  const showFull = decision.state === 'full';
 
   // Record a view (best-effort, published only).
   if (isPublished) await recordGuideView(guide.id, auth?.userId ?? null);
@@ -156,10 +159,15 @@ export default async function GuideReadPage({ params }: { params: Promise<{ slug
         </div>
       )}
 
-      {/* Main content by kind */}
-      {kind === 'article' && <GuideBlocks blocks={guide.body} />}
+      {/* Gated guides show a public intro + access CTA instead of the body. */}
+      {decision.state !== 'full' && (
+        <GuideGate reason={decision.reason} slug={slug} loggedIn={!!auth} />
+      )}
 
-      {kind === 'pdf' && guide.content_url && (
+      {/* Main content by kind */}
+      {showFull && kind === 'article' && <GuideBlocks blocks={guide.body} />}
+
+      {showFull && kind === 'pdf' && guide.content_url && (
         <div className="space-y-4">
           <div className="aspect-[3/4] sm:aspect-video rounded-2xl overflow-hidden border border-neutral-200 bg-neutral-50">
             <iframe src={guide.content_url} title={guide.title} className="w-full h-full" />
@@ -184,7 +192,7 @@ export default async function GuideReadPage({ params }: { params: Promise<{ slug
         </div>
       )}
 
-      {kind === 'link' && guide.content_url && (
+      {showFull && kind === 'link' && guide.content_url && (
         <div className="rounded-2xl border border-neutral-200 bg-white p-6 text-center" style={{ boxShadow: 'var(--shadow-card)' }}>
           <div className="w-12 h-12 mx-auto mb-3 rounded-pill bg-brand-purple-50 flex items-center justify-center text-brand-purple-600">
             <ExternalLink className="w-6 h-6" />
@@ -202,7 +210,7 @@ export default async function GuideReadPage({ params }: { params: Promise<{ slug
       )}
 
       {/* When the body has extra notes alongside a video/pdf/link */}
-      {kind !== 'article' && guide.body.length > 0 && (
+      {showFull && kind !== 'article' && guide.body.length > 0 && (
         <div className="mt-8">
           <GuideBlocks blocks={guide.body} />
         </div>
@@ -238,5 +246,38 @@ export default async function GuideReadPage({ params }: { params: Promise<{ slug
         </div>
       )}
     </article>
+  );
+}
+
+/** Public intro gate shown for registered/premium guides the viewer can't fully open yet. */
+function GuideGate({ reason, slug, loggedIn }: { reason: GateReason; slug: string; loggedIn: boolean }) {
+  const returnTo = `/learn/guides/${slug}`;
+  const href =
+    reason === 'login'
+      ? `/login?return=${encodeURIComponent(returnTo)}`
+      : reason === 'subscription'
+        ? loggedIn
+          ? `/upgrade?return=${encodeURIComponent(returnTo)}`
+          : `/login?return=${encodeURIComponent(returnTo)}`
+        : `/pricing`;
+  return (
+    <div
+      className="rounded-2xl border border-neutral-200 bg-white p-8 text-center"
+      style={{ boxShadow: 'var(--shadow-card)' }}
+    >
+      <div className="w-12 h-12 mx-auto mb-4 rounded-pill bg-brand-purple-50 flex items-center justify-center text-brand-purple-600">
+        <Lock className="w-6 h-6" />
+      </div>
+      <h2 className="text-lg font-extrabold text-neutral-950 mb-1.5">המשך הקריאה דורש גישה</h2>
+      <p className="text-sm text-neutral-500 max-w-sm mx-auto mb-6">
+        שמרו את ההתקדמות שלכם וקבלו גישה מלאה לתוכן הזה ולעוד.
+      </p>
+      <Link
+        href={href}
+        className="inline-flex items-center gap-2 px-5 py-2.5 rounded-pill bg-brand-purple-700 hover:bg-brand-purple-600 text-white text-sm font-bold transition-colors"
+      >
+        {gateCtaLabel(reason)}
+      </Link>
+    </div>
   );
 }
