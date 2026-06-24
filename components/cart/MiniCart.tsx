@@ -25,11 +25,11 @@ export default function MiniCart() {
   const [phone, setPhone] = useState('');
   const [err, setErr] = useState<string | null>(null);
 
+  // Flip `shown` a frame after the panel mounts so it slides in. Closing is the
+  // reverse, driven by close() (which sets shown=false before unmounting) — so we
+  // never setState synchronously in this effect.
   useEffect(() => {
-    if (!open) {
-      setShown(false);
-      return;
-    }
+    if (!open) return;
     const id = setTimeout(() => setShown(true), 10);
     return () => clearTimeout(id);
   }, [open]);

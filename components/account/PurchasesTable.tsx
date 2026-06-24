@@ -9,6 +9,8 @@ export type PurchaseRow = {
   public_order_id: string;
   created_at: string;
   content_id: string;
+  /** 'bundle' for a multi-item cart order; otherwise the single content type. */
+  content_type?: string;
   product_title: string;
   status: 'pending' | 'paid' | 'failed' | 'cancelled' | 'refunded';
   amount: number;
@@ -116,7 +118,11 @@ export default function PurchasesTable({
                 <td className={`${cell} text-neutral-600 whitespace-nowrap`}>{formatDateTime(r.created_at)}</td>
                 <td className={`${cell} text-neutral-900`}>
                   <div>{r.product_title}</div>
-                  <div className="font-mono text-[11px] text-neutral-500" dir="ltr">{r.content_id}</div>
+                  {r.content_type === 'bundle' ? (
+                    <div className="text-[11px] text-neutral-500">סל קניות</div>
+                  ) : (
+                    <div className="font-mono text-[11px] text-neutral-500" dir="ltr">{r.content_id}</div>
+                  )}
                 </td>
                 <td className={cell}>
                   <span className={`inline-block px-2 py-0.5 rounded-pill text-[11px] font-semibold ${STATUS_CLS[r.status]}`}>
@@ -178,6 +184,13 @@ type OrderDetail = {
     currency: string;
     content_type: string;
     product_title: string;
+    products?: {
+      content_id: string;
+      title: string;
+      cover_url: string | null;
+      price_before: number | null;
+      price_after: number | null;
+    }[];
     provider_transaction_id: string | null;
     document_id: string | null;
     has_invoice: boolean;
@@ -287,8 +300,32 @@ export function PurchaseDetailModal({ publicOrderId, onClose }: { publicOrderId:
           <div className="space-y-4">
             <Section title="פרטי הזמנה">
               <Row label="סטטוס" value={<span className={`inline-block px-2 py-0.5 rounded-pill text-[11px] font-semibold ${STATUS_CLS[o.status]}`}>{STATUS_LABEL[o.status]}</span>} />
-              <Row label="מוצר" value={o.product_title} />
-              <Row label="סוג" value={o.content_type} />
+              {o.products && o.products.length > 0 ? (
+                <Row
+                  label="מוצרים"
+                  value={
+                    <ul className="space-y-1.5">
+                      {o.products.map((p) => (
+                        <li key={p.content_id} className="flex items-center justify-end gap-2">
+                          {p.cover_url && (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={p.cover_url} alt="" className="h-6 w-9 rounded object-cover" />
+                          )}
+                          <span className="text-sm text-neutral-900">{p.title}</span>
+                          {p.price_after != null && (
+                            <span className="text-[11px] font-semibold text-brand-purple-700 whitespace-nowrap">
+                              {formatAmount(p.price_after, o.currency)}
+                            </span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  }
+                />
+              ) : (
+                <Row label="מוצר" value={o.product_title} />
+              )}
+              <Row label="סוג" value={o.content_type === 'bundle' ? 'סל קניות' : o.content_type} />
               <Row label="נוצר" value={formatDateTime(o.created_at)} />
               <Row label="עודכן" value={formatDateTime(o.updated_at)} />
               <Row label="ספק תשלום" value={PROVIDER_LABEL[o.provider] ?? o.provider} />

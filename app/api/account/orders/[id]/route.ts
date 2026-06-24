@@ -27,11 +27,31 @@ export async function GET(_request: Request, ctx: { params: Promise<{ id: string
   if (!isOwner && !isAdmin) return NextResponse.json({ error: 'forbidden' }, { status: 403 });
 
   const supabase = createServiceClient();
-  const [{ data: content }, { data: profile }, userRes] = await Promise.all([
+  const [{ data: content }, { data: profile }, userRes, { data: orderItems }] = await Promise.all([
     supabase.from('content_items').select('title, slug').eq('id', order.content_id).maybeSingle(),
     supabase.from('profiles').select('full_name, phone').eq('id', order.user_id).maybeSingle(),
     supabase.auth.admin.getUserById(order.user_id),
+    supabase
+      .from('order_items')
+      .select('content_id, product_title, cover_url, price_before, price_after')
+      .eq('order_id', order.id)
+      .order('created_at', { ascending: true }),
   ]);
+
+  // A multi-item ("bundle") order lists its lines; a single-item order has none.
+  const products = (orderItems ?? []).map((p) => ({
+    content_id: p.content_id as string,
+    title: (p.product_title as string | null) ?? '(תוכן נמחק)',
+    cover_url: (p.cover_url as string | null) ?? null,
+    price_before: p.price_before != null ? Number(p.price_before) : null,
+    price_after: p.price_after != null ? Number(p.price_after) : null,
+  }));
+  const productTitle =
+    order.content_type === 'bundle'
+      ? products.length <= 2
+        ? products.map((p) => p.title).join(' + ') || 'סל קניות'
+        : `${products.length} מוצרים`
+      : (content?.title as string | null) ?? '(תוכן נמחק)';
 
   // Live SUMIT payment data (only for SUMIT orders).
   let payment = null;
@@ -93,7 +113,8 @@ export async function GET(_request: Request, ctx: { params: Promise<{ id: string
       original_amount: order.original_amount != null ? Number(order.original_amount) : null,
       currency: order.currency,
       content_type: order.content_type,
-      product_title: (content?.title as string | null) ?? '(תוכן נמחק)',
+      product_title: productTitle,
+      products,
       provider_transaction_id: order.provider_transaction_id,
       document_id: order.document_id,
       has_invoice: Boolean(order.document_url || order.document_id),

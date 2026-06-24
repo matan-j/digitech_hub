@@ -1,4 +1,4 @@
--- 032_cart.sql
+-- 033_cart.sql
 -- Mini shopping cart (V1) + multi-item ("bundle") orders.
 --
 -- DESIGN RULES (consistent with 020 / 024):
