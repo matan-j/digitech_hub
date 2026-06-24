@@ -255,17 +255,23 @@ function ModuleSection({
 
       {m.chapters.length > 0 && (
         <div className="space-y-3">
-          {m.chapters.map((c) => (
-            <div key={c.id}>
-              <div className="flex items-center gap-2 mb-2">
-                <BookOpen className="w-3.5 h-3.5 text-brand-purple-500" />
-                <h4 className="text-sm font-bold text-brand-purple-800">
-                  פרק {c.num}: {c.title}
-                </h4>
+          {m.chapters.map((c) => {
+            // Hard-locked chapter (migration 029): blocked for everyone, even
+            // with course access. Show it locked regardless of course-level access.
+            const chapterLocked = !!c.is_locked;
+            return (
+              <div key={c.id}>
+                <div className="flex items-center gap-2 mb-2">
+                  <BookOpen className="w-3.5 h-3.5 text-brand-purple-500" />
+                  <h4 className="text-sm font-bold text-brand-purple-800">
+                    פרק {c.num}: {c.title}
+                  </h4>
+                  {chapterLocked && <Lock className="w-3.5 h-3.5 text-neutral-400" aria-label="פרק נעול" />}
+                </div>
+                <LessonList lessons={c.lessons} slug={slug} locked={locked || chapterLocked} completed={completed} compact />
               </div>
-              <LessonList lessons={c.lessons} slug={slug} locked={locked} completed={completed} compact />
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

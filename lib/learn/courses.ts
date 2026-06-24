@@ -28,6 +28,7 @@ function mapLesson(l: DbLesson): Lesson {
     duration: l.duration ?? '',
     body: l.body ?? '',
     resources: (l.resources ?? []).map(mapResource),
+    locked: !!l.chapter_locked,
   };
 }
 

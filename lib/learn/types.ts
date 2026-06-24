@@ -20,6 +20,8 @@ export type Lesson = {
   duration: string;
   body: string;
   resources?: Resource[];
+  /** True when the lesson's chapter is hard-locked (migration 029) — blocked for everyone. */
+  locked?: boolean;
 };
 
 export type Course = {
@@ -83,6 +85,8 @@ export type DbLesson = {
   position: number;
   /** Free preview lesson inside an otherwise gated course (migration 018). */
   is_preview?: boolean;
+  /** Derived (not a column): true if the lesson's chapter is_locked. Stamped by getCourseWithLessons. */
+  chapter_locked?: boolean;
   resources?: DbResource[];
 };
 

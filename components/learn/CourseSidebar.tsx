@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { Check, BookOpen, Bot } from 'lucide-react';
+import { Check, BookOpen, Bot, Lock } from 'lucide-react';
 import type { Course } from '@/lib/learn/types';
 
 type Props = {
@@ -76,14 +76,25 @@ export default function CourseSidebar({ course, activeLessonSlug, completedLesso
           {course.lessons.map((lesson) => {
             const isActive = lesson.slug === activeLessonSlug;
             const isDone = completed.has(lesson.slug);
+            const isLocked = !!lesson.locked;
+
+            // Locked chapters are blocked for everyone — send clicks to the
+            // course landing rather than the (redirecting) lesson page.
+            const href = isLocked
+              ? `/learn/courses/${course.slug}`
+              : `/learn/courses/${course.slug}/${lesson.slug}`;
 
             return (
               <li key={lesson.slug}>
                 <Link
-                  href={`/learn/courses/${course.slug}/${lesson.slug}`}
+                  href={href}
                   className={[
                     'flex items-center gap-3 px-3 py-3 rounded-md transition-colors mt-1',
-                    isActive ? 'bg-brand-purple-700 text-white' : 'hover:bg-neutral-100 text-neutral-700',
+                    isActive
+                      ? 'bg-brand-purple-700 text-white'
+                      : isLocked
+                        ? 'text-neutral-400 hover:bg-neutral-50'
+                        : 'hover:bg-neutral-100 text-neutral-700',
                   ].join(' ')}
                 >
                   <span
@@ -91,23 +102,25 @@ export default function CourseSidebar({ course, activeLessonSlug, completedLesso
                       'w-7 h-7 rounded-pill flex items-center justify-center shrink-0 text-[12px] font-bold tabular-nums',
                       isActive
                         ? 'bg-white text-brand-purple-700'
-                        : isDone
-                          ? 'bg-brand-purple-100 text-brand-purple-700'
-                          : 'bg-neutral-100 text-neutral-500',
+                        : isLocked
+                          ? 'bg-neutral-100 text-neutral-400'
+                          : isDone
+                            ? 'bg-brand-purple-100 text-brand-purple-700'
+                            : 'bg-neutral-100 text-neutral-500',
                     ].join(' ')}
                   >
-                    {isDone ? <Check className="w-3.5 h-3.5" /> : lesson.num}
+                    {isLocked ? <Lock className="w-3.5 h-3.5" /> : isDone ? <Check className="w-3.5 h-3.5" /> : lesson.num}
                   </span>
                   <span className="flex-1 min-w-0">
                     <span
                       className={[
                         'block text-sm font-semibold leading-tight line-clamp-2',
-                        isActive ? 'text-white' : 'text-neutral-950',
+                        isActive ? 'text-white' : isLocked ? 'text-neutral-400' : 'text-neutral-950',
                       ].join(' ')}
                     >
                       {lesson.title}
                     </span>
-                    {lesson.duration && (
+                    {lesson.duration && !isLocked && (
                       <span
                         className={[
                           'block text-xs mt-0.5 tabular-nums',
