@@ -65,6 +65,26 @@ export async function hasActiveEntitlement(
   return !!data;
 }
 
+/**
+ * All resource ids the current user owns for a given type via an ACTIVE
+ * entitlement — purchased OR assigned (source: purchase/admin/gift). Used to
+ * surface owned courses first in the catalog and to unlock their cards.
+ * Returns an empty set for anonymous visitors.
+ */
+export async function listOwnedResourceIds(resourceType: ResourceType): Promise<Set<string>> {
+  const { createClient } = await import('@/lib/supabase/server');
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return new Set();
+  const { data } = await supabase
+    .from('entitlements')
+    .select('resource_id')
+    .eq('user_id', user.id)
+    .eq('resource_type', resourceType)
+    .eq('status', 'active');
+  return new Set((data ?? []).map((r) => (r as { resource_id: string }).resource_id));
+}
+
 export async function revokeEntitlement(params: {
   userId: string;
   resourceType: ResourceType;

@@ -4,6 +4,7 @@ import { getCurrentUser, hasPremiumAccess } from '@/lib/auth';
 import { ArrowLeft, Lock, BookOpen } from 'lucide-react';
 import ShareButton from '@/components/learn/ShareButton';
 import { resolveAccessLevel, resolveDisplayPrice, isPubliclyListed } from '@/lib/learn/access';
+import { listOwnedResourceIds } from '@/lib/payments/entitlement-service';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'קורסים · DigiTech HUB' };
@@ -12,9 +13,16 @@ export default async function CoursesIndexPage() {
   // Public catalog: read metadata from the public view so guests also see
   // premium/paid published courses (shown locked). Unlisted items stay hidden.
   const [items, auth] = await Promise.all([listPublishedContent('course'), getCurrentUser()]);
-  const visible = items.filter(isPubliclyListed);
   const canSeePremium = auth ? hasPremiumAccess(auth.profile) : false;
-  const progress = auth ? await progressByCourse(auth.userId) : {};
+  const [progress, ownedIds] = await Promise.all([
+    auth ? progressByCourse(auth.userId) : Promise.resolve({} as Awaited<ReturnType<typeof progressByCourse>>),
+    auth ? listOwnedResourceIds('course') : Promise.resolve(new Set<string>()),
+  ]);
+  // Owned (purchased/assigned) courses come first, keeping their relative order;
+  // the rest follow. Array.sort is stable, so each group's order is preserved.
+  const visible = items
+    .filter(isPubliclyListed)
+    .sort((a, b) => Number(ownedIds.has(b.id)) - Number(ownedIds.has(a.id)));
 
   return (
     <div className="px-4 sm:px-6 lg:px-10 py-6 lg:py-10 max-w-6xl mx-auto">
@@ -42,9 +50,13 @@ export default async function CoursesIndexPage() {
             const level = resolveAccessLevel(c);
             const isPaid = level === 'purchase_required';
             const dp = isPaid ? resolveDisplayPrice(c) : null;
-            // Paid courses always show their gate on the card (true access is
-            // resolved on the landing page). Legacy premium stays subscription-gated.
-            const locked = isPaid || (c.is_premium && !canSeePremium);
+            // Owned = active entitlement (purchased/assigned). Such cards — plus
+            // those covered by a subscription/admin — render unlocked. Everything
+            // paid or premium otherwise shows its gate; access is re-verified on
+            // the landing page.
+            const owned = ownedIds.has(c.id);
+            const hasAccess = owned || canSeePremium;
+            const locked = !hasAccess && (isPaid || c.is_premium || level === 'subscription_required');
             const cp = progress[c.id];
             const pct = cp && cp.total > 0 ? Math.round((cp.done / cp.total) * 100) : 0;
             return (
@@ -77,6 +89,12 @@ export default async function CoursesIndexPage() {
                         'radial-gradient(circle at 80% 25%, rgba(196,184,230,0.30), transparent 55%), radial-gradient(circle at 18% 88%, rgba(26,15,61,0.55), transparent 55%)',
                     }}
                   />
+                  {locked && (
+                    <div
+                      aria-hidden
+                      className="absolute inset-0 bg-neutral-950/45 transition-colors group-hover:bg-neutral-950/55"
+                    />
+                  )}
                   <div className="absolute inset-0 p-5 flex flex-col justify-end">
                     {c.audience && (
                       <span className="self-start inline-flex items-center text-[11px] font-semibold uppercase tracking-wider text-white/85 bg-white/12 backdrop-blur-sm px-2.5 py-1 rounded-pill">
@@ -86,10 +104,22 @@ export default async function CoursesIndexPage() {
                     <h3 className="mt-2.5 text-white font-extrabold text-lg leading-tight line-clamp-2">{c.title}</h3>
                   </div>
                   {locked && (
-                    <div className="absolute top-3 right-3 bg-white rounded-pill px-2 py-1 flex items-center gap-1 text-[10px] font-bold text-brand-purple-700">
-                      <Lock className="w-3 h-3" />
-                      {isPaid && dp?.final ? dp.final : 'פרימיום'}
-                    </div>
+                    <>
+                      <div className="absolute top-3 right-3 bg-white rounded-pill px-2 py-1 flex items-center gap-1 text-[10px] font-bold text-brand-purple-700 shadow-sm">
+                        <Lock className="w-3 h-3" />
+                        {isPaid && dp?.final ? dp.final : 'פרימיום'}
+                      </div>
+                      {/* Centered lock badge + purchase CTA revealed on hover.
+                          pointer-events-none so the whole card stays one click target. */}
+                      <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 pointer-events-none">
+                        <span className="w-14 h-14 rounded-full bg-black/40 backdrop-blur-sm ring-1 ring-white/20 flex items-center justify-center">
+                          <Lock className="w-6 h-6 text-white" />
+                        </span>
+                        <span className="inline-flex items-center gap-1.5 px-4 py-2 rounded-pill bg-white text-brand-purple-800 text-sm font-extrabold shadow-lg opacity-0 translate-y-1 transition-all duration-200 group-hover:opacity-100 group-hover:translate-y-0">
+                          {isPaid ? (dp?.final ? `רכישה · ${dp.final}` : 'רכישה') : c.is_premium ? 'הצטרפות למועדון' : 'פתיחת גישה'}
+                        </span>
+                      </div>
+                    </>
                   )}
                 </div>
 
@@ -116,7 +146,11 @@ export default async function CoursesIndexPage() {
                   )}
                   <div className="flex items-center justify-end">
                     <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-brand-purple-700 group-hover:text-brand-purple-500 transition-colors">
-                      {isPaid ? (dp?.final ? `רכישה · ${dp.final}` : 'רכישה') : locked ? 'הצטרף' : pct > 0 ? 'המשך' : 'התחל'}
+                      {locked
+                        ? isPaid
+                          ? dp?.final ? `רכישה · ${dp.final}` : 'רכישה'
+                          : 'הצטרף'
+                        : pct > 0 ? 'המשך' : 'התחל'}
                       <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-0.5" />
                     </span>
                   </div>
