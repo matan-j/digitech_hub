@@ -33,9 +33,9 @@ export async function GET(_request: Request, ctx: { params: Promise<{ id: string
     supabase.auth.admin.getUserById(order.user_id),
   ]);
 
-  // Live payment data (best-effort — the card still renders without it).
+  // Live SUMIT payment data (only for SUMIT orders).
   let payment = null;
-  if (order.provider_transaction_id && isSumitConfigured()) {
+  if (order.provider === 'sumit' && order.provider_transaction_id && isSumitConfigured()) {
     try {
       const p = await sumitGetPayment(order.provider_transaction_id);
       payment = {
@@ -51,6 +51,34 @@ export async function GET(_request: Request, ctx: { params: Promise<{ id: string
       };
     } catch (e) {
       console.error('[orders:detail] sumitGetPayment failed', publicOrderId, e instanceof Error ? e.message : e);
+    }
+  }
+
+  // Everything that came back to the success webhook (GROW/Make), stored verbatim
+  // in payment_events. We surface the latest non-SUMIT event's fields so the card
+  // shows the full payment data (card suffix, brand, reference, payer, etc.).
+  let paymentData: { provider: string; received_at: string; status: string; fields: Record<string, string> } | null = null;
+  const { data: ev } = await supabase
+    .from('payment_events')
+    .select('provider, processing_status, created_at, raw_payload')
+    .eq('order_id', order.id)
+    .neq('provider', 'sumit')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (ev?.raw_payload && typeof ev.raw_payload === 'object') {
+    const fields = flattenPrimitives(ev.raw_payload as Record<string, unknown>);
+    // Never echo a shared secret back to the UI.
+    for (const k of Object.keys(fields)) {
+      if (/secret|token/i.test(k)) delete fields[k];
+    }
+    if (Object.keys(fields).length) {
+      paymentData = {
+        provider: ev.provider as string,
+        received_at: ev.created_at as string,
+        status: ev.processing_status as string,
+        fields,
+      };
     }
   }
 
@@ -76,5 +104,19 @@ export async function GET(_request: Request, ctx: { params: Promise<{ id: string
       phone: (profile?.phone as string | null) ?? null,
     },
     payment,
+    paymentData,
   });
+}
+
+/** Flatten a payload to primitive key→string values (nested keys dotted). */
+function flattenPrimitives(obj: Record<string, unknown>, prefix = '', out: Record<string, string> = {}, depth = 0): Record<string, string> {
+  for (const [k, v] of Object.entries(obj)) {
+    if (v === null || v === undefined || v === '') continue;
+    if (typeof v === 'object') {
+      if (depth < 3) flattenPrimitives(v as Record<string, unknown>, `${prefix}${k}.`, out, depth + 1);
+    } else {
+      out[`${prefix}${k}`] = String(v);
+    }
+  }
+  return out;
 }

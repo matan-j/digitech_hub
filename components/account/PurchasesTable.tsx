@@ -167,6 +167,31 @@ type OrderDetail = {
     customerId: string | null;
     transactionId: string | null;
   } | null;
+  paymentData?: {
+    provider: string;
+    received_at: string;
+    status: string;
+    fields: Record<string, string>;
+  } | null;
+};
+
+// Hebrew labels for the GROW/Make success-webhook fields. Unknown keys fall back
+// to the raw key, so EVERY field that came back is displayed.
+const FIELD_LABELS: Record<string, string> = {
+  order_number: 'מספר הזמנה',
+  payment_amount: 'סכום',
+  payment_status: 'סטטוס תשלום',
+  payment_method: 'אמצעי תשלום',
+  payment_type: 'סוג תשלום',
+  payment_reference: 'אסמכתת תשלום',
+  reference_number: 'מספר אסמכתא',
+  process_id: 'מזהה תהליך',
+  card_last4: '4 ספרות אחרונות',
+  card_brand: 'סוג כרטיס',
+  payer_name: 'שם המשלם',
+  payer_email: 'אימייל',
+  num_payments: 'מספר תשלומים',
+  payment_date: 'תאריך תשלום',
 };
 
 function Row({ label, value, mono }: { label: string; value: ReactNode; mono?: boolean }) {
@@ -254,16 +279,24 @@ export function PurchaseDetailModal({ publicOrderId, onClose }: { publicOrderId:
               <Row label="טלפון" value={data.customer.phone} mono />
             </Section>
 
-            {(p || o.provider_transaction_id || o.document_id) && (
+            {p && (
               <Section title="נתוני תשלום (SUMIT)">
-                {p && <Row label="תקין" value={p.valid ? 'כן' : 'לא'} />}
-                {p && <Row label="סטטוס" value={p.statusDescription || p.status} />}
-                {p && <Row label="מספר אישור" value={p.authNumber} mono />}
-                {p && <Row label="תאריך תשלום" value={p.paymentDate ? formatDateTime(p.paymentDate) : null} />}
-                {p && p.amount != null && <Row label="סכום שחויב" value={formatAmount(p.amount, p.currency || o.currency)} />}
+                <Row label="תקין" value={p.valid ? 'כן' : 'לא'} />
+                <Row label="סטטוס" value={p.statusDescription || p.status} />
+                <Row label="מספר אישור" value={p.authNumber} mono />
+                <Row label="תאריך תשלום" value={p.paymentDate ? formatDateTime(p.paymentDate) : null} />
+                {p.amount != null && <Row label="סכום שחויב" value={formatAmount(p.amount, p.currency || o.currency)} />}
                 <Row label="מזהה עסקה" value={o.provider_transaction_id} mono />
-                {p?.customerId && <Row label="מזהה לקוח SUMIT" value={p.customerId} mono />}
+                {p.customerId && <Row label="מזהה לקוח SUMIT" value={p.customerId} mono />}
                 <Row label="מזהה מסמך" value={o.document_id} mono />
+              </Section>
+            )}
+
+            {data.paymentData && Object.keys(data.paymentData.fields).length > 0 && (
+              <Section title="נתוני התשלום שהתקבלו">
+                {Object.entries(data.paymentData.fields).map(([k, v]) => (
+                  <Row key={k} label={FIELD_LABELS[k] ?? k} value={v} mono={!FIELD_LABELS[k]} />
+                ))}
               </Section>
             )}
 
