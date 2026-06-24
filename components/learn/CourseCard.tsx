@@ -1,19 +1,26 @@
 import Link from 'next/link';
 import { ArrowLeft, Layers, Clock } from 'lucide-react';
 import type { Course } from '@/lib/learn/types';
+import ShareButton from '@/components/learn/ShareButton';
 
 export default function CourseCard({ course }: { course: Course }) {
   const totalLessons = course.lessons.length;
 
   return (
-    <Link
-      href={`/learn/courses/${course.slug}`}
-      className="
-        group block bg-white rounded-card border border-neutral-200
-        hover:border-brand-purple-700 transition-all overflow-hidden
-      "
-      style={{ boxShadow: 'var(--shadow-card)' }}
-    >
+    <div className="relative">
+      {/* Share button is a sibling of the card <Link> so we never nest a
+          <button> inside an <a>. */}
+      <div className="absolute top-3 left-3 z-10">
+        <ShareButton path={`/learn/courses/${course.slug}`} title={course.title} />
+      </div>
+      <Link
+        href={`/learn/courses/${course.slug}`}
+        className="
+          group block bg-white rounded-card border border-neutral-200
+          hover:border-brand-purple-700 transition-all overflow-hidden
+        "
+        style={{ boxShadow: 'var(--shadow-card)' }}
+      >
       {/* Cover */}
       <div
         className="aspect-[16/9] relative bg-brand-purple-900"
@@ -71,6 +78,7 @@ export default function CourseCard({ course }: { course: Course }) {
           </span>
         </div>
       </div>
-    </Link>
+      </Link>
+    </div>
   );
 }
