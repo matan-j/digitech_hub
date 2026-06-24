@@ -43,8 +43,12 @@ export default async function CourseLanding({ params }: { params: Promise<{ cour
   const auth = await getCurrentUser();
   const hasPremium = !!auth && hasPremiumAccess(auth.profile);
   const level = resolveAccessLevel(course);
+  // Both paid (purchase_required) and premium (subscription_required) courses can
+  // be unlocked by an active per-course entitlement (purchase / admin / gift).
   const hasEntitlement =
-    level === 'purchase_required' && !!auth ? await hasActiveEntitlement('course', course.id) : false;
+    (level === 'purchase_required' || level === 'subscription_required') && !!auth
+      ? await hasActiveEntitlement('course', course.id)
+      : false;
   const decision = decideAccess(course, { loggedIn: !!auth, hasPremium, hasEntitlement });
   const full = decision.state === 'full';
   const locked = !full;

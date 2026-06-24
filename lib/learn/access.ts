@@ -89,7 +89,9 @@ export function decideAccess(
     case 'purchase_required':
       return opts.hasEntitlement || opts.hasPremium ? { state: 'full' } : previewOrLocked('purchase');
     case 'subscription_required':
-      return opts.hasPremium ? { state: 'full' } : previewOrLocked('subscription');
+      // An active per-course entitlement (purchase / admin / gift) bypasses the
+      // premium lock, mirroring has_content_access() in the DB.
+      return opts.hasPremium || opts.hasEntitlement ? { state: 'full' } : previewOrLocked('subscription');
   }
 }
 
