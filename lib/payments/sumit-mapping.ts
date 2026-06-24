@@ -25,16 +25,28 @@ export function buildCustomer(params: {
 }
 
 /**
- * Single line item for a course purchase. UnitPrice is the server-computed final
- * price (sale price when a discount is active, else the regular price). One unit.
- * SUMIT currency is the ISO code string ('ILS').
+ * Line items for a course purchase. UnitPrice is the server-computed price — the
+ * client's number is never used. SUMIT currency is the ISO code string ('ILS').
+ *
+ * No discount → a single line at the final price.
+ * Discount active → two lines so the SUMIT payment page SHOWS the saving:
+ *   1) the course at its full (regular) price,
+ *   2) a negative "discount" line.
+ * The two lines sum to the sale price (resolveFinalPrice().final), so the total
+ * charged still equals the order amount the confirm route validates.
  */
-export function buildRedirectItem(course: { title?: string | null } & PriceFields): SumitItem {
+export function buildRedirectItems(course: { title?: string | null } & PriceFields): SumitItem[] {
   const price = resolveFinalPrice(course);
-  return {
-    Item: { Name: course.title ?? 'Course' },
-    Quantity: 1,
-    UnitPrice: price.final,
-    Currency: price.currency || 'ILS',
-  };
+  const name = course.title ?? 'Course';
+  const currency = price.currency || 'ILS';
+
+  if (!price.hasDiscount) {
+    return [{ Item: { Name: name }, Quantity: 1, UnitPrice: price.final, Currency: currency }];
+  }
+
+  const discount = Math.round((price.original - price.final) * 100) / 100;
+  return [
+    { Item: { Name: name }, Quantity: 1, UnitPrice: price.original, Currency: currency },
+    { Item: { Name: `הנחה — ${name}` }, Quantity: 1, UnitPrice: -discount, Currency: currency },
+  ];
 }

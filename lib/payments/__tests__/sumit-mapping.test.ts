@@ -4,7 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolveFinalPrice } from '../pricing.ts';
-import { buildCustomer, buildRedirectItem } from '../sumit-mapping.ts';
+import { buildCustomer, buildRedirectItems } from '../sumit-mapping.ts';
 
 test('resolveFinalPrice charges the sale price when a discount is active', () => {
   const p = resolveFinalPrice({ price_amount: 199, sale_amount: 149, price_currency: 'ILS' });
@@ -32,18 +32,28 @@ test('resolveFinalPrice treats a 0 / missing price as free', () => {
   assert.equal(resolveFinalPrice({ price_amount: null, sale_amount: null }).isFree, true);
 });
 
-test('buildRedirectItem uses the server final price and ILS, quantity 1', () => {
-  const item = buildRedirectItem({ title: 'קורס ביג דאטה', price_amount: 199, sale_amount: 149, price_currency: 'ILS' });
-  assert.equal(item.UnitPrice, 149); // sale, not regular — and never a client value
-  assert.equal(item.Quantity, 1);
-  assert.equal(item.Currency, 'ILS');
-  assert.equal(item.Item.Name, 'קורס ביג דאטה');
+test('buildRedirectItems: no discount → one line at the final price, ILS, qty 1', () => {
+  const items = buildRedirectItems({ title: 'X', price_amount: 199, sale_amount: null, price_currency: 'ILS' });
+  assert.equal(items.length, 1);
+  assert.equal(items[0].UnitPrice, 199);
+  assert.equal(items[0].Quantity, 1);
+  assert.equal(items[0].Currency, 'ILS');
+  assert.equal(items[0].Item.Name, 'X');
 });
 
-test('buildRedirectItem falls back to ILS when currency missing', () => {
-  const item = buildRedirectItem({ title: 'X', price_amount: 50 });
-  assert.equal(item.Currency, 'ILS');
-  assert.equal(item.UnitPrice, 50);
+test('buildRedirectItems: discount → full-price line + negative discount line; sum = sale', () => {
+  const items = buildRedirectItems({ title: 'קורס ביג דאטה', price_amount: 199, sale_amount: 149, price_currency: 'ILS' });
+  assert.equal(items.length, 2);
+  assert.equal(items[0].UnitPrice, 199);                 // shown to the buyer as the regular price
+  assert.equal(items[1].UnitPrice, -50);                 // the visible discount line
+  const total = items.reduce((s, i) => s + i.UnitPrice * i.Quantity, 0);
+  assert.equal(total, 149);                              // total charged = the server final price
+});
+
+test('buildRedirectItems falls back to ILS when currency missing', () => {
+  const items = buildRedirectItems({ title: 'X', price_amount: 50 });
+  assert.equal(items[0].Currency, 'ILS');
+  assert.equal(items[0].UnitPrice, 50);
 });
 
 test('buildCustomer maps profile + auth email; falls back name→email', () => {

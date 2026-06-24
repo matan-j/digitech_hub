@@ -13,7 +13,7 @@ import { grantEntitlement } from '@/lib/payments/entitlement-service';
 import { enrollInCourse } from '@/lib/learn/enrollment';
 import { resolveAccessLevel } from '@/lib/learn/access';
 import { isSumitConfigured, sumitBeginRedirect } from '@/lib/payments/sumit';
-import { buildCustomer, buildRedirectItem } from '@/lib/payments/sumit-mapping';
+import { buildCustomer, buildRedirectItems } from '@/lib/payments/sumit-mapping';
 
 export const runtime = 'nodejs';
 
@@ -139,7 +139,7 @@ export async function POST(request: Request) {
   try {
     const result = await sumitBeginRedirect({
       customer: buildCustomer({ name: profileRow?.full_name as string | null, email: auth.email, phone }),
-      item: buildRedirectItem(item),
+      items: buildRedirectItems(item),
       redirectUrl,
       externalIdentifier: order.public_order_id,
     });
