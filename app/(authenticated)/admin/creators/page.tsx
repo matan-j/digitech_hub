@@ -56,7 +56,7 @@ export default async function CreatorsAdminPage() {
               <tr>
                 <th className="text-right px-4 py-3 font-semibold">יוצר</th>
                 <th className="text-right px-4 py-3 font-semibold">משתמש משויך</th>
-                <th className="text-right px-4 py-3 font-semibold">מדריכים</th>
+                <th className="text-right px-4 py-3 font-semibold">הדרכות</th>
                 <th className="text-right px-4 py-3 font-semibold">פלייליסטים</th>
                 <th className="text-right px-4 py-3 font-semibold">Featured</th>
                 <th className="text-right px-4 py-3 font-semibold">סטטוס</th>

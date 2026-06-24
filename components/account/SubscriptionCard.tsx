@@ -110,7 +110,7 @@ export default function SubscriptionCard({ profile }: { profile: Profile }) {
       {!isAdmin && (profile.subscription_status === 'none' || profile.subscription_status === 'past_due') && (
         <>
           <p className="text-sm text-neutral-600 mb-4">
-            הירשם למועדון כדי לקבל גישה מלאה לקורסים, מדריכים ופלייבוקים.
+            הירשם למועדון כדי לקבל גישה מלאה לקורסים, הדרכות ופלייבוקים.
           </p>
           <button
             onClick={startCheckout}

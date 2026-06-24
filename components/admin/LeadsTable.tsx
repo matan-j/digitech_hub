@@ -435,7 +435,7 @@ function LeadDetailPanel({
               <section>
                 <h3 className="text-sm font-bold text-neutral-800 mb-3">נקודות מגע ראשונות</h3>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-                  <Field label="מדריך ראשון" value={detail.first_guide_touchpoint} />
+                  <Field label="הדרכה ראשונה" value={detail.first_guide_touchpoint} />
                   <Field label="יוצר ראשון" value={detail.first_creator_touchpoint} />
                   <Field label="קורס ראשון" value={detail.first_course_touchpoint} />
                 </div>

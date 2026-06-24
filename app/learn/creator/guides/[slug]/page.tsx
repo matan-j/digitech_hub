@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic';
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const g = await getGuide(slug);
-  return { title: g ? `${g.title} — עריכה` : 'מדריך לא נמצא' };
+  return { title: g ? `${g.title} — עריכה` : 'הדרכה לא נמצאה' };
 }
 
 export default async function CreatorGuideEditPage({ params }: { params: Promise<{ slug: string }> }) {
@@ -27,7 +27,7 @@ export default async function CreatorGuideEditPage({ params }: { params: Promise
       <CreatorDashboardNav />
       <Link href="/learn/creator/guides" className="inline-flex items-center gap-1 text-sm text-neutral-500 hover:text-neutral-900 mb-4">
         <ArrowRight className="w-3.5 h-3.5" />
-        חזרה למדריכים שלי
+        חזרה להדרכות שלי
       </Link>
       <GuideEditor initial={guide} mode="creator" backHref="/learn/creator/guides" />
     </div>

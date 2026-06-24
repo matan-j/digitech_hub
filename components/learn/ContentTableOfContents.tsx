@@ -12,11 +12,11 @@ type Props = {
 };
 
 /**
- * "במדריך הזה" table of contents. Renders only when given entries
+ * "בהדרכה הזו" table of contents. Renders only when given entries
  * (pages gate on >=3 H2). Sidebar variant scroll-spies the active
  * section; inline variant collapses on small screens.
  */
-export default function ContentTableOfContents({ entries, variant = 'sidebar', title = 'במדריך הזה' }: Props) {
+export default function ContentTableOfContents({ entries, variant = 'sidebar', title = 'בהדרכה הזו' }: Props) {
   const [active, setActive] = useState<string | null>(entries[0]?.id ?? null);
   const [open, setOpen] = useState(false);
 

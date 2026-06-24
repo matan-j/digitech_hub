@@ -500,7 +500,7 @@ export function toRichBlocks(content: GuideBlock[] | string | null | undefined):
 
 export type TocEntry = { id: string; text: string };
 
-/** Top-level (H2) entries for the "במדריך הזה" table of contents. */
+/** Top-level (H2) entries for the "בהדרכה הזו" table of contents. */
 export function extractToc(blocks: RichBlock[]): TocEntry[] {
   return blocks
     .filter((b): b is Extract<RichBlock, { type: 'heading' }> => b.type === 'heading' && b.level === 2)

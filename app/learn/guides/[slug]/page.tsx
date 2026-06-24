@@ -27,7 +27,7 @@ export const dynamic = 'force-dynamic';
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const g = await getGuideWithCreator(slug);
-  if (!g) return { title: 'מדריך לא נמצא' };
+  if (!g) return { title: 'הדרכה לא נמצאה' };
   return {
     title: g.seo_title || `${g.title} — Digitech Learning Hub`,
     description: g.seo_description || g.tagline || undefined,
@@ -75,7 +75,7 @@ export default async function GuideReadPage({ params }: { params: Promise<{ slug
   const ytId = youtubeIdFromUrl(guide.content_url) ?? youtubeIdFromUrl(guide.video_url);
   const vimeo = guide.content_url ? parseVimeoInput(guide.content_url) : null;
 
-  // "במדריך הזה" table of contents — shown when the body has 3+ H2 sections.
+  // "בהדרכה הזו" table of contents — shown when the body has 3+ H2 sections.
   const toc = showFull ? extractToc(toRichBlocks(guide.body)) : [];
   const hasToc = toc.length >= 3;
 
@@ -83,13 +83,13 @@ export default async function GuideReadPage({ params }: { params: Promise<{ slug
     <article className={['px-4 sm:px-6 lg:px-10 py-8 mx-auto', hasToc ? 'max-w-5xl' : 'max-w-3xl'].join(' ')}>
       <Link href="/learn/guides" className="inline-flex items-center gap-1 text-sm text-neutral-500 hover:text-neutral-900 mb-6">
         <ArrowRight className="w-3.5 h-3.5" />
-        חזרה למדריכים
+        חזרה להדרכות
       </Link>
 
       {!isPublished && (
         <div className="mb-6 flex items-center gap-2 rounded-card border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800">
           <Eye className="w-4 h-4" />
-          תצוגה מקדימה — המדריך עדיין בטיוטה ואינו גלוי לציבור.
+          תצוגה מקדימה — ההדרכה עדיין בטיוטה ואינה גלויה לציבור.
         </div>
       )}
 

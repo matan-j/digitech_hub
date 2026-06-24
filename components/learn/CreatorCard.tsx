@@ -42,7 +42,7 @@ export default function CreatorCard({
       <div className="flex items-center gap-4 mt-4 text-xs text-neutral-500">
         <span className="flex items-center gap-1.5">
           <BookOpen className="w-3.5 h-3.5 text-brand-purple-600" />
-          {guides} מדריכים
+          {guides} הדרכות
         </span>
         <span className="flex items-center gap-1.5">
           <ListVideo className="w-3.5 h-3.5 text-brand-purple-600" />

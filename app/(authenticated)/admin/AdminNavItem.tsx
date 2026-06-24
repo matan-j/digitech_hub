@@ -8,7 +8,7 @@ const NAV = [
   { href: '/admin', label: 'דאשבורד', Icon: LayoutDashboard, exact: true },
   { href: '/admin/homepage', label: 'עמוד הבית', Icon: Home, exact: false },
   { href: '/admin/courses', label: 'קורסים', Icon: BookOpen, exact: false },
-  { href: '/admin/guides', label: 'מדריכים', Icon: Compass, exact: false },
+  { href: '/admin/guides', label: 'הדרכות', Icon: Compass, exact: false },
   { href: '/admin/playbooks', label: 'פלייבוקים', Icon: BookText, exact: false },
   { href: '/admin/taxonomy', label: 'תחומים וקטגוריות', Icon: Tags, exact: false },
   { href: '/admin/users', label: 'משתמשים', Icon: Users, exact: false },

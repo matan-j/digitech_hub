@@ -16,7 +16,7 @@ export default async function PlaylistsAdminPage() {
       <header className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-extrabold text-neutral-950">פלייליסטים</h1>
-          <p className="text-sm text-neutral-500 mt-1">אוספי מדריכים מאורגנים, מקובצים לפי יוצר.</p>
+          <p className="text-sm text-neutral-500 mt-1">אוספי הדרכות מאורגנים, מקובצים לפי יוצר.</p>
         </div>
         <Link
           href="/admin/playlists/new"
@@ -32,7 +32,7 @@ export default async function PlaylistsAdminPage() {
             <ListVideo className="w-6 h-6" />
           </div>
           <h3 className="font-extrabold text-neutral-900 mb-1">אין עדיין פלייליסטים</h3>
-          <p className="text-sm text-neutral-500 mb-4">צור פלייליסט ושייך לו יוצר ומדריכים.</p>
+          <p className="text-sm text-neutral-500 mb-4">צור פלייליסט ושייך לו יוצר והדרכות.</p>
           <Link href="/admin/playlists/new" className="inline-flex items-center gap-2 px-4 py-2 rounded-pill bg-brand-purple-700 hover:bg-brand-purple-600 text-white text-sm font-semibold transition-colors">
             <Plus className="w-4 h-4" /> צור פלייליסט חדש
           </Link>
@@ -44,7 +44,7 @@ export default async function PlaylistsAdminPage() {
               <tr>
                 <th className="text-right px-4 py-3 font-semibold">כותרת</th>
                 <th className="text-right px-4 py-3 font-semibold">יוצר</th>
-                <th className="text-right px-4 py-3 font-semibold">מדריכים</th>
+                <th className="text-right px-4 py-3 font-semibold">הדרכות</th>
                 <th className="text-right px-4 py-3 font-semibold">סטטוס</th>
               </tr>
             </thead>

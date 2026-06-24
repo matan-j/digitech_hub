@@ -5,7 +5,7 @@ const COLS: { title: string; links: { label: string; href: string }[] }[] = [
     title: 'גלה',
     links: [
       { label: 'קורסים', href: '/learn/courses' },
-      { label: 'מדריכים', href: '/learn/guides' },
+      { label: 'הדרכות', href: '/learn/guides' },
       { label: 'יוצרים', href: '/learn/creators' },
       { label: 'פלייליסטים', href: '/learn/playlists' },
     ],
@@ -36,7 +36,7 @@ export default function MarketingFooter() {
             DigiTech<span className="text-brand-teal align-top text-[10px] font-extrabold tracking-wider mr-1">HUB</span>
           </span>
           <p className="mt-3 text-sm text-neutral-500 leading-relaxed max-w-xs">
-            פלטפורמת הלמידה הפרקטית של דיגיטק — קורסים, מדריכים ופלייבוקים מהיוצרים המובילים בישראל.
+            פלטפורמת הלמידה הפרקטית של דיגיטק — קורסים, הדרכות ופלייבוקים מהיוצרים המובילים בישראל.
           </p>
         </div>
         {COLS.map((col) => (

@@ -177,7 +177,7 @@ export default function GuideEditor({ initial, mode = 'admin', creators = [], ba
   }
 
   async function handleDelete() {
-    if (!confirm('למחוק את המדריך לצמיתות?')) return;
+    if (!confirm('למחוק את ההדרכה לצמיתות?')) return;
     const res = await fetch(`/api/content/guide/${initial.slug}`, { method: 'DELETE' });
     if (res.ok) router.push(backHref);
   }
@@ -192,7 +192,7 @@ export default function GuideEditor({ initial, mode = 'admin', creators = [], ba
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="כותרת המדריך"
+              placeholder="כותרת ההדרכה"
               className="w-full text-2xl font-extrabold text-neutral-950 bg-transparent border-0 focus:outline-none focus:bg-neutral-50 rounded px-2 -mx-2 py-1"
             />
             <input
@@ -288,7 +288,7 @@ export default function GuideEditor({ initial, mode = 'admin', creators = [], ba
           </div>
           <div className="p-5 bg-[var(--color-bg-main)]">
             <article className="mx-auto bg-white rounded-2xl border border-neutral-200 p-6" style={{ maxWidth: previewMobile ? 390 : 760 }}>
-              <h1 className="text-2xl lg:text-3xl font-extrabold text-neutral-950 mb-2 leading-tight" dir="auto">{title || 'כותרת המדריך'}</h1>
+              <h1 className="text-2xl lg:text-3xl font-extrabold text-neutral-950 mb-2 leading-tight" dir="auto">{title || 'כותרת ההדרכה'}</h1>
               {tagline && <p className="text-lg text-neutral-600 leading-relaxed mb-6" dir="auto">{tagline}</p>}
               <RichContentRenderer content={blocks} emptyLabel="אין עדיין תוכן." />
             </article>
@@ -428,7 +428,7 @@ export default function GuideEditor({ initial, mode = 'admin', creators = [], ba
 
         {/* Slug (URL) — editable at any stage */}
         <div className="mb-4 pb-4 border-b border-neutral-100">
-          <label className="block text-xs font-semibold text-neutral-600 mb-1">כתובת המדריך (Slug)</label>
+          <label className="block text-xs font-semibold text-neutral-600 mb-1">כתובת ההדרכה (Slug)</label>
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs text-neutral-400 font-mono" dir="ltr">/learn/guides/</span>
             <input
@@ -450,7 +450,7 @@ export default function GuideEditor({ initial, mode = 'admin', creators = [], ba
           {slugError ? (
             <p className="mt-1.5 text-[11px] text-red-600">{slugError}</p>
           ) : (
-            <p className="mt-1.5 text-[11px] text-amber-600">שינוי הקישור ישבור קישורים קיימים למדריך זה. ניתן לשנות בכל שלב.</p>
+            <p className="mt-1.5 text-[11px] text-amber-600">שינוי הקישור ישבור קישורים קיימים להדרכה זו. ניתן לשנות בכל שלב.</p>
           )}
         </div>
 
@@ -493,7 +493,7 @@ export default function GuideEditor({ initial, mode = 'admin', creators = [], ba
 
       <section className="bg-white rounded-2xl border border-neutral-200 p-5">
         <h2 className="text-sm font-extrabold text-neutral-700 uppercase tracking-wide mb-3">
-          {contentKind === 'article' ? 'תוכן המדריך' : 'הערות נוספות (אופציונלי)'}
+          {contentKind === 'article' ? 'תוכן ההדרכה' : 'הערות נוספות (אופציונלי)'}
         </h2>
         <BlockEditor value={blocks} onChange={setBlocks} />
       </section>

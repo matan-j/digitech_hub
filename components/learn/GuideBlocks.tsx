@@ -6,5 +6,5 @@ import RichContentRenderer from './RichContentRenderer';
  * RichContentRenderer (semantic HTML, callouts, prompt blocks, etc.).
  */
 export default function GuideBlocks({ blocks }: { blocks: GuideBlock[] }) {
-  return <RichContentRenderer content={blocks} emptyLabel="מדריך זה עוד ריק." />;
+  return <RichContentRenderer content={blocks} emptyLabel="הדרכה זו עוד ריקה." />;
 }

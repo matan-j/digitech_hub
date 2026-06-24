@@ -27,7 +27,7 @@ export default async function CreatorDashboard() {
     <div className="px-4 sm:px-6 lg:px-10 py-6 lg:py-10 max-w-5xl mx-auto">
       <header className="mb-6">
         <h1 className="text-2xl sm:text-3xl font-extrabold text-neutral-950">לוח יוצר</h1>
-        <p className="text-sm text-neutral-700 mt-1.5">נהל את הפרופיל, המדריכים והפלייליסטים שלך.</p>
+        <p className="text-sm text-neutral-700 mt-1.5">נהל את הפרופיל, ההדרכות והפלייליסטים שלך.</p>
       </header>
 
       <CreatorDashboardNav />
@@ -56,14 +56,14 @@ async function DashboardBody({ creatorId, creatorSlug }: { creatorId: string; cr
   return (
     <div className="space-y-8">
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-        <StatCard icon={BookOpen} value={stats.guides} label="מדריכים" />
+        <StatCard icon={BookOpen} value={stats.guides} label="הדרכות" />
         <StatCard icon={ListVideo} value={stats.playlists} label="פלייליסטים" />
         <StatCard icon={Eye} value={stats.views} label="צפיות" />
       </div>
 
       <div className="flex flex-wrap gap-3">
         <Link href="/learn/creator/guides/new" className="inline-flex items-center gap-2 px-4 py-2 rounded-pill bg-brand-purple-700 hover:bg-brand-purple-600 text-white text-sm font-semibold transition-colors">
-          <Plus className="w-4 h-4" /> מדריך חדש
+          <Plus className="w-4 h-4" /> הדרכה חדשה
         </Link>
         <Link href="/learn/creator/playlists/new" className="inline-flex items-center gap-2 px-4 py-2 rounded-pill border border-neutral-300 hover:border-brand-purple-400 text-neutral-700 text-sm font-semibold transition-colors">
           <Plus className="w-4 h-4" /> פלייליסט חדש
@@ -76,7 +76,7 @@ async function DashboardBody({ creatorId, creatorSlug }: { creatorId: string; cr
       <section>
         <h2 className="text-lg font-extrabold text-neutral-950 mb-4">תוכן אחרון</h2>
         {recent.length === 0 ? (
-          <EmptyState icon={BookOpen} title="אין עדיין מדריכים" message="צור את המדריך הראשון שלך." cta={{ label: 'מדריך חדש', href: '/learn/creator/guides/new' }} compact />
+          <EmptyState icon={BookOpen} title="אין עדיין הדרכות" message="צור את ההדרכה הראשונה שלך." cta={{ label: 'הדרכה חדשה', href: '/learn/creator/guides/new' }} compact />
         ) : (
           <div className="bg-white rounded-card border border-neutral-200 overflow-hidden" style={{ boxShadow: 'var(--shadow-card)' }}>
             {recent.map((g) => (

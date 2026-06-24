@@ -25,7 +25,7 @@ export const dynamic = 'force-dynamic';
 
 export const metadata = {
   title: 'DigiTech HUB — השכלה פרקטית',
-  description: 'קורסים, מדריכים ופלייבוקים מהיוצרים המובילים בישראל. התחילו ללמוד בחינם.',
+  description: 'קורסים, הדרכות ופלייבוקים מהיוצרים המובילים בישראל. התחילו ללמוד בחינם.',
 };
 
 const VALUE_PROPS = [
@@ -185,7 +185,7 @@ export default async function HomePage() {
         const items = take(guides, s.limit ?? 6);
         if (items.length === 0) return null;
         return (
-          <Section key={s.key} title={s.title || 'מדריכים אחרונים'} href={s.cta_href || '/learn/guides'} cta={s.cta_label || 'כל המדריכים'}>
+          <Section key={s.key} title={s.title || 'הדרכות אחרונות'} href={s.cta_href || '/learn/guides'} cta={s.cta_label || 'כל ההדרכות'}>
             <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
               {items.map((g) => (
                 <GuideCard key={g.id} guide={g} />

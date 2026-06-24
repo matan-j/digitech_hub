@@ -28,7 +28,7 @@ export default function PlaylistCard({ playlist, count }: { playlist: Playlist; 
         )}
         <span className="absolute bottom-3 right-3 inline-flex items-center gap-1 px-2 py-0.5 rounded-pill text-[10px] font-bold bg-black/55 text-white backdrop-blur-sm">
           <PlaySquare className="w-3 h-3" />
-          {count} מדריכים
+          {count} הדרכות
         </span>
         {domainMeta && (
           <span className={['absolute top-3 right-3 inline-flex items-center px-2 py-0.5 rounded-pill text-[10px] font-bold border', domainBadgeClasses(playlist.domain)].join(' ')}>
