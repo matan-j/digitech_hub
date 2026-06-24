@@ -201,8 +201,26 @@ export function validatePaymentAgainstOrder(
   if (event.amount != null && Number(event.amount) !== Number(order.amount)) {
     return `amount mismatch: order=${order.amount} event=${event.amount}`;
   }
-  if (event.currency != null && event.currency !== order.currency) {
+  // Currency is normalised before comparing: SUMIT/OfficeGuy returns ILS as the
+  // enum 0 (not the literal "ILS"), so a raw !== would wrongly fail a valid ILS
+  // payment. The amount check above is the real guard.
+  if (event.currency != null && normalizeCurrency(event.currency) !== normalizeCurrency(order.currency)) {
     return `currency mismatch: order=${order.currency} event=${event.currency}`;
   }
   return null;
+}
+
+/**
+ * Map SUMIT's currency representations to an ISO code. ILS may arrive as the enum
+ * 0, "0", "ILS", "NIS", "₪" or blank. Known foreign codes map to their ISO;
+ * anything unrecognised falls back to ILS, because this flow only ever creates ILS
+ * orders — so an unfamiliar ILS representation must never reject a valid payment.
+ */
+function normalizeCurrency(c: string | number | null | undefined): string {
+  if (c == null || c === '') return 'ILS';
+  const s = String(c).trim().toUpperCase();
+  if (['1', 'USD', '$', 'US$', 'DOLLAR'].includes(s)) return 'USD';
+  if (['2', 'EUR', '€', 'EURO'].includes(s)) return 'EUR';
+  if (['3', 'GBP', '£'].includes(s)) return 'GBP';
+  return 'ILS';
 }
