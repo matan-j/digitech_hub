@@ -78,7 +78,7 @@ export default async function CheckoutPendingPage({
             המשך לעיון בקורסים
             <ArrowLeft className="w-4 h-4" />
           </Link>
-          <Link href="/account" className="inline-block px-6 py-3 rounded-pill border border-neutral-300 text-neutral-700 font-medium hover:bg-neutral-50 transition-colors">
+          <Link href="/learn/account" className="inline-block px-6 py-3 rounded-pill border border-neutral-300 text-neutral-700 font-medium hover:bg-neutral-50 transition-colors">
             לאזור האישי
           </Link>
         </div>

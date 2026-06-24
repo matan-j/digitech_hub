@@ -4,6 +4,7 @@ import { useEffect, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus, X, Copy, Check, Loader2, GraduationCap, ChevronLeft } from 'lucide-react';
 import type { UserRow } from './page';
+import PurchasesTable, { type PurchaseRow } from '@/components/account/PurchasesTable';
 
 const STATUS_LABEL: Record<UserRow['subscription_status'], string> = {
   active: 'מנוי פעיל',
@@ -153,7 +154,7 @@ type Grant = {
   granted_at: string;
 };
 type Course = { id: string; slug: string; title: string; type: string };
-type AccessData = { courses: Course[]; grants: Grant[] };
+type AccessData = { courses: Course[]; grants: Grant[]; purchases: PurchaseRow[] };
 
 function UserDetailModal({
   user,
@@ -359,6 +360,18 @@ function UserDetailModal({
                 )}
               </div>
             </>
+          )}
+        </div>
+
+        {/* Purchases */}
+        <div className="mt-5">
+          <h3 className="text-xs font-extrabold text-neutral-700 uppercase tracking-wide mb-2">רכישות</h3>
+          {loading ? (
+            <div className="flex items-center gap-2 text-neutral-500 text-sm py-3">
+              <Loader2 className="w-4 h-4 animate-spin" /> טוען…
+            </div>
+          ) : (
+            <PurchasesTable rows={data?.purchases ?? []} compact emptyText="אין רכישות עדיין." />
           )}
         </div>
 

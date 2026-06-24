@@ -228,7 +228,7 @@ export default function NavSidebar({
         {auth ? (
           <>
             <Link
-              href="/account"
+              href="/learn/account"
               className="flex items-center gap-3 px-3 py-2.5 rounded-card bg-white/6 hover:bg-white/10 transition-colors border border-white/8"
             >
               <div className="w-9 h-9 rounded-pill bg-white/15 flex items-center justify-center text-white text-sm font-bold shrink-0">

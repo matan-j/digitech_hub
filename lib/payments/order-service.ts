@@ -25,6 +25,8 @@ export type Order = {
   status: OrderStatus;
   provider_transaction_id: string | null;
   checkout_url: string | null;
+  document_id: string | null;
+  document_url: string | null;
   request_webhook_status: RequestWebhookStatus;
   request_webhook_sent_at: string | null;
   request_webhook_error: string | null;
@@ -120,12 +122,44 @@ export async function setOrderProviderRef(
   if (error) throw new Error(`setOrderProviderRef failed: ${error.message}`);
 }
 
+/** Persist the SUMIT receipt/invoice document reference on an order (best-effort). */
+export async function setOrderInvoice(
+  orderId: string,
+  params: { documentId?: string | null; documentUrl?: string | null },
+): Promise<void> {
+  const patch: Record<string, unknown> = {};
+  if (params.documentId != null) patch.document_id = params.documentId;
+  if (params.documentUrl != null) patch.document_url = params.documentUrl;
+  if (!Object.keys(patch).length) return;
+  const supabase = createServiceClient();
+  const { error } = await supabase.from('orders').update(patch).eq('id', orderId);
+  if (error) console.error('[order-service] setOrderInvoice failed', orderId, error.message);
+}
+
 export async function getOrderByPublicId(publicOrderId: string): Promise<Order | null> {
   const supabase = createServiceClient();
   const { data } = await supabase
     .from('orders')
     .select('*')
     .eq('public_order_id', publicOrderId)
+    .maybeSingle();
+  return (data as Order) ?? null;
+}
+
+/**
+ * Find an order by the SUMIT payment/transaction id we stored at checkout.
+ * Webhook fallback for the case where the trigger payload omits our external
+ * identifier but carries the SUMIT payment id. Newest first, so a re-used
+ * checkout never resolves to a stale row.
+ */
+export async function getOrderByProviderTransactionId(transactionId: string): Promise<Order | null> {
+  const supabase = createServiceClient();
+  const { data } = await supabase
+    .from('orders')
+    .select('*')
+    .eq('provider_transaction_id', transactionId)
+    .order('created_at', { ascending: false })
+    .limit(1)
     .maybeSingle();
   return (data as Order) ?? null;
 }

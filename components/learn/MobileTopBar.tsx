@@ -75,7 +75,7 @@ export default function MobileTopBar({
           </span>
         </Link>
         <Link
-          href={auth ? '/account' : '/login'}
+          href={auth ? '/learn/account' : '/login'}
           aria-label={auth ? 'החשבון שלי' : 'התחבר'}
           className="p-2 -ml-2 rounded-pill text-white/85 text-xs font-semibold hover:bg-white/8"
         >
@@ -172,7 +172,7 @@ export default function MobileTopBar({
               {auth ? (
                 <>
                   <Link
-                    href="/account"
+                    href="/learn/account"
                     onClick={closeMenu}
                     className="block w-full text-center px-3 py-2.5 rounded-pill bg-white text-brand-purple-700 text-sm font-bold"
                   >

@@ -1,6 +1,6 @@
 import 'server-only';
 import type { Course, Lesson } from './types';
-import { getCourseWithLessons, getDbChapterById, listPublishedContent } from './db';
+import { getCourseWithLessons, listPublishedContent } from './db';
 import type { CourseWithLessons, DbLesson, DbResource } from './types';
 
 // ----------------------------------------------------------------
@@ -28,7 +28,7 @@ function mapLesson(l: DbLesson): Lesson {
     duration: l.duration ?? '',
     body: l.body ?? '',
     resources: (l.resources ?? []).map(mapResource),
-    locked: !!l.chapter_locked,
+    locked: !!l.hard_locked,
   };
 }
 
@@ -76,15 +76,12 @@ export async function getLesson(courseSlug: string, lessonSlug: string) {
   const idx = course.lessons.findIndex((l) => l.slug === lessonSlug);
   if (idx === -1) return null;
 
-  // Per-chapter hard lock (migration 028): a locked chapter is blocked for
-  // EVERYONE, overriding entitlements and free-preview. Look up the lesson's
-  // chapter and read its is_locked flag.
+  // Hierarchical hard lock (migrations 029/031): a lesson is blocked for
+  // EVERYONE when its module, its chapter, or the lesson itself is_locked —
+  // overriding entitlements and free-preview. getCourseWithLessons already
+  // stamped the effective flag onto each flat lesson.
   const dbLesson = full.lessons.find((l) => l.slug === lessonSlug) ?? null;
-  let chapterLocked = false;
-  if (dbLesson?.chapter_id) {
-    const chapter = await getDbChapterById(dbLesson.chapter_id);
-    chapterLocked = !!chapter?.is_locked;
-  }
+  const hardLocked = !!dbLesson?.hard_locked;
 
   return {
     course,
@@ -98,7 +95,7 @@ export async function getLesson(courseSlug: string, lessonSlug: string) {
     accessLevel: full.access_level ?? null,
     courseId: full.id,
     isPreviewLesson: full.lessons[idx]?.is_preview ?? false,
-    // Per-chapter hard lock (migration 028) — blocks everyone when true.
-    chapterLocked,
+    // Effective hierarchical hard lock (migrations 029/031) — blocks everyone when true.
+    hardLocked,
   };
 }

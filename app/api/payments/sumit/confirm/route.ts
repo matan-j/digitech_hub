@@ -1,15 +1,7 @@
 import { NextResponse } from 'next/server';
-import crypto from 'crypto';
 import { createServiceClient } from '@/lib/supabase/server';
-import { sumitGetPayment } from '@/lib/payments/sumit';
-import {
-  getOrderByPublicId,
-  markOrderPaid,
-  markOrderFailed,
-  validatePaymentAgainstOrder,
-  type Order,
-} from '@/lib/payments/order-service';
-import { grantEntitlement } from '@/lib/payments/entitlement-service';
+import { getOrderByPublicId, type Order } from '@/lib/payments/order-service';
+import { settleSumitOrder } from '@/lib/payments/sumit-settle';
 
 export const runtime = 'nodejs';
 
@@ -33,80 +25,33 @@ export async function GET(request: Request) {
     url.searchParams.get('OG-PaymentID') ??
     url.searchParams.get('og-paymentid') ??
     url.searchParams.get('PaymentID');
+  // SUMIT may also append the created document id (the receipt/invoice).
+  const documentIdParam =
+    url.searchParams.get('OG-DocumentID') ??
+    url.searchParams.get('og-documentid') ??
+    url.searchParams.get('DocumentID');
 
   if (!publicOrderId) return dest('/payment/failed');
 
   const order = await getOrderByPublicId(publicOrderId);
   if (!order) return dest('/payment/failed');
 
-  const supabase = createServiceClient();
   const slug = await courseSlug(order);
+  const success = () => dest(`/learn/checkout/success?course=${encodeURIComponent(slug ?? '')}`);
 
-  // Already settled (idempotent re-entry) — don't re-verify or re-grant.
-  if (order.status === 'paid') {
-    return dest(`/learn/checkout/success?course=${encodeURIComponent(slug ?? '')}`);
-  }
-
-  const paymentId = paymentIdParam ?? order.provider_transaction_id;
-
-  const log = async (status: 'processed' | 'error' | 'ignored', raw: unknown, error?: string) => {
-    await supabase.from('payment_events').insert({
-      order_id: order.id,
-      provider: 'sumit',
-      provider_event_id: `confirm-${crypto.randomUUID()}`,
-      event_type: 'confirm',
-      raw_payload: (raw ?? {}) as Record<string, unknown>,
-      processing_status: status,
-      processing_error: error ?? null,
-      processed_at: new Date().toISOString(),
-    });
-  };
-
-  if (!paymentId) {
-    await log('ignored', { reason: 'missing payment id', publicOrderId });
-    return dest('/payment/failed');
-  }
-
-  let payment;
-  try {
-    payment = await sumitGetPayment(String(paymentId));
-  } catch (e) {
-    console.error('[sumit:confirm] verify failed', publicOrderId, e);
-    await log('error', { error: String(e) }, String(e));
-    return dest('/payment/failed');
-  }
-
-  // Verified-not-valid → never grant access.
-  if (!payment.valid) {
-    await markOrderFailed(order.id);
-    await log('processed', payment.raw, 'payment not valid');
-    return dest('/payment/failed');
-  }
-
-  // Defence-in-depth: the verified amount/currency must match our order.
-  const mismatch = validatePaymentAgainstOrder(order, {
-    amount: payment.amount,
-    currency: payment.currency,
-    providerTransactionId: payment.transactionId,
+  // Verify with SUMIT + grant access BEFORE redirecting the user into the app.
+  // Idempotent: an already-paid order (e.g. the webhook beat us here) returns
+  // 'already_paid' and we still send the user to success.
+  const result = await settleSumitOrder({
+    order,
+    paymentIdHint: paymentIdParam,
+    documentIdHint: documentIdParam,
+    source: 'confirm',
+    rawPayload: { publicOrderId, paymentIdParam, documentIdParam, query: Object.fromEntries(url.searchParams) },
   });
-  if (mismatch) {
-    await markOrderFailed(order.id);
-    await log('error', payment.raw, mismatch);
-    return dest('/payment/failed');
-  }
 
-  // Grant access BEFORE redirecting the user back into the app.
-  await markOrderPaid(order.id, payment.transactionId);
-  await grantEntitlement({
-    userId: order.user_id,
-    resourceType: order.content_type,
-    resourceId: order.content_id,
-    orderId: order.id,
-    source: 'purchase',
-  });
-  await log('processed', payment.raw);
-
-  return dest(`/learn/checkout/success?course=${encodeURIComponent(slug ?? '')}`);
+  if (result.outcome === 'granted' || result.outcome === 'already_paid') return success();
+  return dest('/payment/failed');
 }
 
 async function courseSlug(order: Order): Promise<string | null> {

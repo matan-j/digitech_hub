@@ -1,12 +1,13 @@
 import { NextResponse } from 'next/server';
-import { getCurrentUser } from '@/lib/auth';
+import { getCurrentUser, type AuthState } from '@/lib/auth';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
-import { resolveFinalPrice } from '@/lib/payments/pricing';
+import { resolveFinalPrice, type ResolvedPrice } from '@/lib/payments/pricing';
 import {
   createPendingOrder,
   getOpenPendingOrder,
   setOrderProviderRef,
   markOrderPaid,
+  markRequestWebhook,
   type ContentType,
 } from '@/lib/payments/order-service';
 import { grantEntitlement } from '@/lib/payments/entitlement-service';
@@ -14,19 +15,41 @@ import { enrollInCourse } from '@/lib/learn/enrollment';
 import { resolveAccessLevel } from '@/lib/learn/access';
 import { isSumitConfigured, sumitBeginRedirect } from '@/lib/payments/sumit';
 import { buildCustomer, buildRedirectItems } from '@/lib/payments/sumit-mapping';
+import {
+  sendPurchaseRequestWebhook,
+  israelDateTime,
+  type PurchaseWebhookPayload,
+} from '@/lib/payments/make-webhook';
 
 export const runtime = 'nodejs';
 
 const PURCHASABLE: ContentType[] = ['course', 'guide'];
 
+type PurchaseItem = {
+  id: string;
+  slug: string;
+  title: string | null;
+  price_amount: number | null;
+  sale_amount: number | null;
+  price_currency: string | null;
+};
+
 /**
- * POST { contentType, slug } — the single V1 purchase entry point.
+ * Active paid-checkout flow. Default 'make' (the lead-webhook model). The full
+ * SUMIT Redirect flow stays in the codebase — set PAYMENT_FLOW=sumit to use it.
+ */
+function paidFlow(): 'make' | 'sumit' {
+  return process.env.PAYMENT_FLOW === 'sumit' ? 'sumit' : 'make';
+}
+
+/**
+ * POST { contentType, slug, phone? } — the single V1 purchase entry point.
  *
  * Server-trusted price (the client's numbers are never read):
  *   final == 0 → FREE: grant access immediately, record it, → success page.
- *   final  > 0 → PAID: create ONE pending order, open a SUMIT hosted Redirect
- *                checkout, and return its URL. NO access is granted here — that
- *                happens only in /api/payments/sumit/confirm after SUMIT verifies.
+ *   final  > 0 → PAID: depends on PAYMENT_FLOW —
+ *                'make' (default): pending order + Make.com lead webhook → pending page.
+ *                'sumit':          SUMIT hosted Redirect checkout.
  */
 export async function POST(request: Request) {
   const auth = await getCurrentUser();
@@ -35,6 +58,7 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}));
   const contentType = (body.contentType as ContentType | undefined) ?? 'course';
   const slug = body.slug as string | undefined;
+  const phoneInput = typeof body.phone === 'string' ? body.phone.trim() : '';
   if (!slug || !PURCHASABLE.includes(contentType)) {
     return NextResponse.json({ error: 'invalid_request' }, { status: 400 });
   }
@@ -55,14 +79,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'not_found' }, { status: 404 });
   }
 
-  const supabase = await createClient();
-
   const level = resolveAccessLevel(item);
   const price = resolveFinalPrice(item);
 
   // ----------------------------------------------------------------
   // FREE path — final price 0 (genuinely free OR fully discounted).
-  // Grant immediately and record it. No SUMIT payment is created.
+  // Grant immediately and record it. No payment webhook / link.
   // ----------------------------------------------------------------
   if (price.isFree) {
     if (level === 'open' || level === 'login_required') {
@@ -98,8 +120,128 @@ export async function POST(request: Request) {
   }
 
   // ----------------------------------------------------------------
-  // PAID path — open a SUMIT Redirect checkout. No access granted here.
+  // PAID path — route to the active flow.
   // ----------------------------------------------------------------
+  return paidFlow() === 'sumit'
+    ? paidViaSumit(request, auth, item as PurchaseItem, contentType, price)
+    : paidViaMake(auth, item as PurchaseItem, contentType, price, phoneInput);
+}
+
+/**
+ * PAID — Make.com lead model. Create ONE pending order, fire the lead webhook
+ * with all the data, and send the buyer to the branded pending page. No access is
+ * granted here and no payment link is opened — that happens out-of-band.
+ */
+async function paidViaMake(
+  auth: AuthState,
+  item: PurchaseItem,
+  contentType: ContentType,
+  price: ResolvedPrice,
+  phoneInput: string,
+) {
+  const supabase = await createClient();
+
+  // Phone is required for the lead. Prefer the stored profile phone; accept and
+  // persist a freshly-collected one from the request.
+  const { data: profileRow } = await supabase
+    .from('profiles')
+    .select('phone, full_name')
+    .eq('id', auth.userId)
+    .maybeSingle();
+  let phone = (profileRow?.phone as string | null) ?? '';
+  if (!phone && phoneInput) {
+    phone = phoneInput;
+    const service = createServiceClient();
+    await service.from('profiles').update({ phone }).eq('id', auth.userId);
+  }
+  if (!phone) {
+    return NextResponse.json({ error: 'phone_required' }, { status: 400 });
+  }
+
+  // Reuse an existing open order (idempotency) — never create a second one.
+  const existing = await getOpenPendingOrder(auth.userId, contentType, item.id);
+
+  // Already have a GROW payment link for this open order → reuse it on a
+  // double-click / refresh instead of creating a second link.
+  if (existing?.checkout_url) {
+    return NextResponse.json({ status: 'redirect', url: existing.checkout_url });
+  }
+
+  const order =
+    existing ??
+    (await createPendingOrder({
+      userId: auth.userId,
+      contentType,
+      contentId: item.id,
+      amount: price.final,
+      originalAmount: price.original,
+      currency: price.currency,
+    }));
+
+  const payload: PurchaseWebhookPayload = {
+    customer_name: (profileRow?.full_name as string | null) ?? auth.profile.full_name ?? '',
+    customer_email: auth.email,
+    customer_phone: phone,
+    current_datetime: israelDateTime(),
+    products: [
+      {
+        product_name: item.title ?? item.slug,
+        price_before_discount: price.original,
+        price_after_discount: price.final,
+      },
+    ],
+    public_order_id: order.public_order_id,
+    user_id: auth.userId,
+    content_type: contentType,
+    content_id: item.id,
+    content_slug: item.slug,
+    amount: price.final,
+    original_amount: price.original,
+    currency: price.currency,
+  };
+
+  const sent = await sendPurchaseRequestWebhook(payload);
+  if (!sent.ok) {
+    await markRequestWebhook(order.id, 'failed', sent.error);
+    return NextResponse.json(
+      { error: 'webhook_failed', publicOrderId: order.public_order_id },
+      { status: 502 },
+    );
+  }
+  await markRequestWebhook(order.id, 'sent');
+
+  // Make returns the GROW payment link + process id. Persist them (process id is
+  // how the GROW webhook later matches this order) and send the buyer to pay.
+  if (sent.processId || sent.paymentUrl) {
+    await setOrderProviderRef(order.id, {
+      checkoutUrl: sent.paymentUrl ?? undefined,
+      transactionId: sent.processId ?? undefined,
+    });
+  }
+  if (sent.paymentUrl) {
+    return NextResponse.json({ status: 'redirect', url: sent.paymentUrl });
+  }
+
+  // No payment link came back → fall back to the branded pending page.
+  return NextResponse.json({
+    status: 'pending',
+    redirect: `/learn/checkout/pending?order=${encodeURIComponent(order.public_order_id)}`,
+  });
+}
+
+/**
+ * PAID — SUMIT hosted Redirect checkout (ON HOLD; enable with PAYMENT_FLOW=sumit).
+ * No access granted here — that happens only in /api/payments/sumit/confirm (or
+ * the trigger webhook) after SUMIT verifies the payment.
+ */
+async function paidViaSumit(
+  request: Request,
+  auth: AuthState,
+  item: PurchaseItem,
+  contentType: ContentType,
+  price: ResolvedPrice,
+) {
+  const supabase = await createClient();
   const { data: profileRow } = await supabase
     .from('profiles')
     .select('phone, full_name')

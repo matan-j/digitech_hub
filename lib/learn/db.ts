@@ -264,11 +264,15 @@ export async function getCourseWithLessons(slug: string): Promise<CourseWithLess
 
   const flat: DbLesson[] = [];
   for (const m of course.modules) {
+    // Hierarchical hard lock (migrations 029/031): a lesson is locked if its
+    // module, its chapter, or the lesson itself is_locked. Module lock cascades
+    // to every chapter/lesson; chapter lock cascades to its lessons.
+    const moduleLocked = !!m.is_locked;
     for (const c of m.chapters) {
-      // Stamp the chapter's hard-lock onto each lesson (migration 029).
-      for (const l of c.lessons) flat.push({ ...l, chapter_locked: !!c.is_locked });
+      const chapterLocked = moduleLocked || !!c.is_locked;
+      for (const l of c.lessons) flat.push({ ...l, hard_locked: chapterLocked || !!l.is_locked });
     }
-    for (const l of m.lessons) flat.push({ ...l, chapter_locked: false });
+    for (const l of m.lessons) flat.push({ ...l, hard_locked: moduleLocked || !!l.is_locked });
   }
   // Restore the legacy CourseWithLessons shape (no `modules` field)
   const { modules: _modules, ...courseBase } = course;

@@ -51,5 +51,8 @@ test-research-only.ts
 # claude-code local-machine settings (keep settings.json shared)
 .claude/settings.local.json
 
+# claude-code session/agent data (transcripts, memory) — never commit
+.claude/projects/
+
 # supabase CLI cache (contains DB pooler URL with credentials — must never be committed)
 supabase/.temp/

@@ -20,7 +20,7 @@ export type Lesson = {
   duration: string;
   body: string;
   resources?: Resource[];
-  /** True when the lesson's chapter is hard-locked (migration 029) — blocked for everyone. */
+  /** True when the lesson is hard-locked (migration 031) by its module, chapter, or itself — blocked for everyone. */
   locked?: boolean;
 };
 
@@ -85,8 +85,10 @@ export type DbLesson = {
   position: number;
   /** Free preview lesson inside an otherwise gated course (migration 018). */
   is_preview?: boolean;
-  /** Derived (not a column): true if the lesson's chapter is_locked. Stamped by getCourseWithLessons. */
-  chapter_locked?: boolean;
+  /** Hard lock on this single lesson (migration 031): blocks just this lesson for EVERYONE. */
+  is_locked?: boolean;
+  /** Derived (not a column): effective hard lock = module OR chapter OR lesson is_locked. Stamped by getCourseWithLessons. */
+  hard_locked?: boolean;
   resources?: DbResource[];
 };
 
@@ -100,6 +102,8 @@ export type DbModule = {
   duration: string | null;
   body: string | null;
   position: number;
+  /** Hard lock (migration 031): when true the module + all its chapters/lessons are blocked for EVERYONE. */
+  is_locked?: boolean;
   resources?: DbResource[];
 };
 

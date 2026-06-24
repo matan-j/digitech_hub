@@ -11,7 +11,7 @@ type Props = {
 
 export default async function UpgradeSuccessPage({ searchParams }: Props) {
   const { return: returnTo } = await searchParams;
-  await requireUser('/account');
+  await requireUser('/learn/account');
   // Note: webhook may take 1-2s to land. The page is reachable regardless;
   // we trust the user just paid and show success. The DB will catch up.
 
@@ -36,7 +36,7 @@ export default async function UpgradeSuccessPage({ searchParams }: Props) {
             {returnTo ? 'המשך לתוכן' : 'התחל ללמוד'}
           </Link>
           <Link
-            href="/account"
+            href="/learn/account"
             className="px-4 py-2.5 rounded-pill border border-neutral-300 hover:border-brand-purple-400 text-neutral-800 text-sm font-medium transition-colors"
           >
             ניהול החשבון

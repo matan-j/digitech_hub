@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { updateSession } from './lib/supabase/middleware';
 
 const ADMIN_PREFIXES = ['/admin', '/learn-admin'];
-const AUTH_REQUIRED_PREFIXES = ['/account', '/upgrade/success'];
+const AUTH_REQUIRED_PREFIXES = ['/learn/account', '/upgrade/success'];
 
 // Paths under /admin that must remain publicly accessible (no auth) so the
 // admin login flow itself can render. Anything else under /admin is gated.

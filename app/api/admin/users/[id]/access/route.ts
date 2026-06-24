@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { getUserPurchases } from '@/lib/payments/purchase-history';
 
 export const runtime = 'nodejs';
 
@@ -17,7 +18,7 @@ export async function GET(_request: Request, ctx: { params: Promise<{ id: string
   const { id: userId } = await ctx.params;
   const supabase = createServiceClient();
 
-  const [{ data: content }, { data: ents }, { data: enrolls }] = await Promise.all([
+  const [{ data: content }, { data: ents }, { data: enrolls }, purchases] = await Promise.all([
     supabase.from('content_items').select('id, slug, title, type').in('type', ['course', 'guide']),
     supabase
       .from('entitlements')
@@ -29,6 +30,7 @@ export async function GET(_request: Request, ctx: { params: Promise<{ id: string
       .select('content_item_id, source, status, enrolled_at')
       .eq('user_id', userId)
       .eq('status', 'active'),
+    getUserPurchases(userId),
   ]);
 
   const byId = new Map<string, ContentLite>((content ?? []).map((c) => [c.id, c as ContentLite]));
@@ -56,5 +58,5 @@ export async function GET(_request: Request, ctx: { params: Promise<{ id: string
     .filter((c) => c.type === 'course')
     .sort((a, b) => (a.title ?? '').localeCompare(b.title ?? '', 'he'));
 
-  return NextResponse.json({ courses, grants });
+  return NextResponse.json({ courses, grants, purchases });
 }

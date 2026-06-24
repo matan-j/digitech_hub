@@ -24,12 +24,13 @@ export default async function LessonPage({
   const { course: courseSlug, lesson: lessonSlug } = await params;
   const data = await getLesson(courseSlug, lessonSlug);
   if (!data) notFound();
-  const { course, lesson, prev, next, lessonId, isPremium, accessLevel, courseId, isPreviewLesson, chapterLocked } = data;
+  const { course, lesson, prev, next, lessonId, isPremium, accessLevel, courseId, isPreviewLesson, hardLocked } = data;
 
-  // Per-chapter HARD lock (migration 028): blocked for EVERYONE — owners,
-  // subscribers, admin-granted users and admins alike. Overrides entitlements
-  // and free-preview. Send them back to the course landing.
-  if (chapterLocked) {
+  // Hierarchical HARD lock (migrations 029/031): blocked for EVERYONE — owners,
+  // subscribers, admin-granted users and admins alike — when the lesson's
+  // module, chapter, or the lesson itself is locked. Overrides entitlements and
+  // free-preview. Send them back to the course landing.
+  if (hardLocked) {
     redirect(`/learn/courses/${courseSlug}`);
   }
 

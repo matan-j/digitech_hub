@@ -6,18 +6,48 @@ import { createClient } from '@/lib/supabase/server';
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'הגישה נפתחה — Digitech Hub' };
 
+/**
+ * Thank-you page. Accepts either:
+ *   ?order=<public_order_id>  (preferred — GROW/Make return URL) → resolves the
+ *                             course from the order and shows the order number.
+ *   ?course=<slug>            (legacy) → resolves by slug.
+ */
 export default async function CheckoutSuccessPage({
   searchParams,
 }: {
-  searchParams: Promise<{ course?: string }>;
+  searchParams: Promise<{ course?: string; order?: string }>;
 }) {
-  const { course: slug } = await searchParams;
-  await requireUser(slug ? `/learn/checkout/success?course=${slug}` : '/learn/courses');
+  const { course: courseParam, order: publicOrderId } = await searchParams;
+  const here = publicOrderId
+    ? `/learn/checkout/success?order=${publicOrderId}`
+    : courseParam
+      ? `/learn/checkout/success?course=${courseParam}`
+      : '/learn/courses';
+  await requireUser(here);
+
+  const supabase = await createClient();
+
+  // Resolve the course slug — from the order (owner-only via RLS) or the param.
+  let slug = courseParam ?? null;
+  if (!slug && publicOrderId) {
+    const { data: order } = await supabase
+      .from('orders')
+      .select('content_id')
+      .eq('public_order_id', publicOrderId)
+      .maybeSingle();
+    if (order?.content_id) {
+      const { data: item } = await supabase
+        .from('content_items')
+        .select('slug')
+        .eq('id', order.content_id)
+        .maybeSingle();
+      slug = (item?.slug as string) ?? null;
+    }
+  }
 
   let title: string | null = null;
   let courseHref = '/learn/courses';
   if (slug) {
-    const supabase = await createClient();
     const { data } = await supabase
       .from('content_items')
       .select('title, slug')
@@ -44,6 +74,12 @@ export default async function CheckoutSuccessPage({
           <p className="text-[11px] font-semibold uppercase tracking-wide text-brand-purple-700 mb-1">קיבלת</p>
           <p className="font-bold text-neutral-900">{title ?? 'הקורס שלך'}</p>
           <p className="text-xs text-emerald-700 mt-1">הגישה פעילה ✓</p>
+          {publicOrderId && (
+            <div className="mt-3 pt-3 border-t border-brand-purple-100/70 flex items-center justify-between gap-2">
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500">מספר הזמנה</span>
+              <span className="font-mono text-sm font-bold text-neutral-800" dir="ltr">{publicOrderId}</span>
+            </div>
+          )}
         </div>
 
         <div className="flex flex-col gap-2">

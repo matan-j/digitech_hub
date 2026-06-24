@@ -23,7 +23,7 @@ export default async function UpgradePage({ searchParams }: Props) {
   const auth = await getCurrentUser();
 
   if (auth && hasPremiumAccess(auth.profile)) {
-    redirect(returnTo ?? '/account');
+    redirect(returnTo ?? '/learn/account');
   }
 
   return (

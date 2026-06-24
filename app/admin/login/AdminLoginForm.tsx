@@ -52,7 +52,7 @@ export default function AdminLoginForm({ returnTo }: { returnTo?: string }) {
 
       // reset password
       const redirect = new URL('/auth/callback', window.location.origin);
-      redirect.searchParams.set('next', '/account');
+      redirect.searchParams.set('next', '/learn/account');
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: redirect.toString(),
       });

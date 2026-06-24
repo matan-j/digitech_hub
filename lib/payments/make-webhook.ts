@@ -33,6 +33,11 @@ export type PurchaseWebhookPayload = {
   user_id: string;
   content_type: string;
   content_id: string;
+  content_slug: string;
+  // Order totals (server-trusted), so Make has the full picture in one payload.
+  amount: number;
+  original_amount: number;
+  currency: string;
 };
 
 /** Israel-local timestamp formatted as DD/MM/YYYY HH:mm (e.g. 26/06/2026 14:30). */
@@ -52,12 +57,36 @@ export function israelDateTime(d: Date = new Date()): string {
   return `${get('day')}/${get('month')}/${get('year')} ${hh}:${get('minute')}`;
 }
 
-export type WebhookResult = { ok: true } | { ok: false; error: string };
+export type WebhookResult =
+  | { ok: true; paymentUrl: string | null; processId: string | null }
+  | { ok: false; error: string };
+
+/** Pull payment_url + process_id out of Make's response (tolerant of shapes). */
+function parseMakeResponse(raw: string): { paymentUrl: string | null; processId: string | null } {
+  let body: Record<string, unknown> = {};
+  try {
+    body = JSON.parse(raw) as Record<string, unknown>;
+  } catch {
+    return { paymentUrl: null, processId: null };
+  }
+  const get = (keys: string[]): string | null => {
+    for (const k of keys) {
+      const v = body[k] ?? (body.data as Record<string, unknown> | undefined)?.[k];
+      if (v != null && String(v).trim() !== '') return String(v).trim();
+    }
+    return null;
+  };
+  return {
+    paymentUrl: get(['payment_url', 'paymentUrl', 'url']),
+    processId: get(['process_id', 'processId', 'paymentLinkProcessId']),
+  };
+}
 
 /**
- * Fire the purchase-request webhook. Returns a result instead of throwing so the
- * caller can mark the order's request_webhook_status and surface a retry to the
- * user without leaving the order in an undefined state.
+ * Fire the purchase-request webhook to Make and read its synchronous response,
+ * which carries the GROW payment link: { payment_url, process_id }. Returns a
+ * result instead of throwing so the caller can store the process id, redirect the
+ * buyer to payment_url, and mark the order's request_webhook_status.
  */
 export async function sendPurchaseRequestWebhook(
   payload: PurchaseWebhookPayload,
@@ -69,15 +98,16 @@ export async function sendPurchaseRequestWebhook(
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
       // Don't hang the request forever if Make.com is slow/unreachable.
-      signal: AbortSignal.timeout(10_000),
+      signal: AbortSignal.timeout(15_000),
     });
+    const text = await res.text().catch(() => '');
     if (!res.ok) {
-      const detail = await res.text().catch(() => '');
-      console.error('[make-webhook] non-2xx', res.status, detail.slice(0, 300));
+      console.error('[make-webhook] non-2xx', res.status, text.slice(0, 300));
       return { ok: false, error: `webhook_status_${res.status}` };
     }
-    console.info('[make-webhook] sent', payload.public_order_id);
-    return { ok: true };
+    const { paymentUrl, processId } = parseMakeResponse(text);
+    console.info('[make-webhook] sent', payload.public_order_id, { hasPaymentUrl: !!paymentUrl, processId });
+    return { ok: true, paymentUrl, processId };
   } catch (e) {
     const error = e instanceof Error ? e.message : 'unknown';
     console.error('[make-webhook] failed', payload.public_order_id, error);

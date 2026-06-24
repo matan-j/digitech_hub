@@ -716,6 +716,14 @@ function ModuleBlock({
         onDragStart={() => onDragStart({ kind: 'modules' }, mIdx)}
         onDragOver={onDragOver}
         onDrop={() => onDrop({ kind: 'modules' }, mIdx)}
+        headerAction={
+          <LockToggle
+            endpoint={`/api/modules/${mod.id}`}
+            locked={!!mod.is_locked}
+            kindLabel="מודול"
+            onToggled={(next) => onModuleChange({ ...mod, is_locked: next })}
+          />
+        }
       />
 
       <div className="bg-brand-purple-50/30 p-3 space-y-3">
@@ -756,6 +764,14 @@ function ModuleBlock({
                 onDragStart={() => onDragStart({ kind: 'lessons', moduleId: mod.id, chapterId: null }, lIdx)}
                 onDragOver={onDragOver}
                 onDrop={() => onDrop({ kind: 'lessons', moduleId: mod.id, chapterId: null }, lIdx)}
+                headerAction={
+                  <LockToggle
+                    endpoint={`/api/lessons/${l.id}`}
+                    locked={!!l.is_locked}
+                    kindLabel="שיעור"
+                    onToggled={(next) => onLessonChange(null, { ...l, is_locked: next })}
+                  />
+                }
               />
             ))}
           </div>
@@ -826,7 +842,14 @@ function ChapterBlock({
         onDragStart={() => onDragStart({ kind: 'chapters', moduleId }, cIdx)}
         onDragOver={onDragOver}
         onDrop={() => onDrop({ kind: 'chapters', moduleId }, cIdx)}
-        headerAction={<ChapterLockToggle chapter={chapter} onChange={onChapterChange} />}
+        headerAction={
+          <LockToggle
+            endpoint={`/api/chapters/${chapter.id}`}
+            locked={!!chapter.is_locked}
+            kindLabel="פרק"
+            onToggled={(next) => onChapterChange({ ...chapter, is_locked: next })}
+          />
+        }
       />
       <div className="bg-brand-purple-50/20 p-3 space-y-2">
         {chapter.lessons.length > 0 && (
@@ -843,6 +866,14 @@ function ChapterBlock({
                 onDragStart={() => onDragStart({ kind: 'lessons', moduleId, chapterId: chapter.id }, lIdx)}
                 onDragOver={onDragOver}
                 onDrop={() => onDrop({ kind: 'lessons', moduleId, chapterId: chapter.id }, lIdx)}
+                headerAction={
+                  <LockToggle
+                    endpoint={`/api/lessons/${l.id}`}
+                    locked={!!l.is_locked}
+                    kindLabel="שיעור"
+                    onToggled={(next) => onLessonChange({ ...l, is_locked: next })}
+                  />
+                }
               />
             ))}
           </div>
@@ -861,35 +892,40 @@ function ChapterBlock({
 }
 
 // ============================================================
-// ChapterLockToggle — small lock icon button in the chapter header.
-// Locked = blocked for everyone (migration 028); optimistic + persists via PUT.
+// LockToggle — small lock icon button in a node header (module / chapter /
+// lesson). Locked = blocked for everyone (migrations 029/031), cascading down
+// the hierarchy. Optimistic + persists via PUT to the node's endpoint.
 // ============================================================
-function ChapterLockToggle({
-  chapter,
-  onChange,
+function LockToggle({
+  endpoint,
+  locked,
+  kindLabel,
+  onToggled,
 }: {
-  chapter: ChapterWithLessons;
-  onChange: (next: DbChapter) => void;
+  endpoint: string;
+  locked: boolean;
+  kindLabel: 'מודול' | 'פרק' | 'שיעור';
+  onToggled: (next: boolean) => void;
 }) {
-  const [locked, setLocked] = useState(!!chapter.is_locked);
+  const [isLocked, setIsLocked] = useState(locked);
   const [busy, setBusy] = useState(false);
 
   async function toggle(e: React.MouseEvent) {
     e.stopPropagation();
     if (busy) return;
-    const next = !locked;
+    const next = !isLocked;
     setBusy(true);
-    setLocked(next); // optimistic
-    const res = await fetch(`/api/chapters/${chapter.id}`, {
+    setIsLocked(next); // optimistic
+    const res = await fetch(endpoint, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ is_locked: next }),
     });
     setBusy(false);
     if (res.ok) {
-      onChange({ ...chapter, is_locked: next });
+      onToggled(next);
     } else {
-      setLocked(!next); // rollback
+      setIsLocked(!next); // rollback
     }
   }
 
@@ -898,15 +934,15 @@ function ChapterLockToggle({
       type="button"
       onClick={toggle}
       disabled={busy}
-      aria-pressed={locked}
-      title={locked ? 'פרק נעול — חסום לכל המשתמשים. לחץ לפתיחה' : 'פרק פתוח. לחץ לנעילה לכולם'}
-      aria-label={locked ? 'פתח פרק' : 'נעל פרק'}
+      aria-pressed={isLocked}
+      title={isLocked ? `${kindLabel} נעול — חסום לכל המשתמשים (כולל מי שרכש). לחץ לפתיחה` : `${kindLabel} פתוח. לחץ לנעילה לכולם`}
+      aria-label={isLocked ? `פתח ${kindLabel}` : `נעל ${kindLabel}`}
       className={[
         'p-1 rounded transition-colors disabled:opacity-50',
-        locked ? 'text-rose-600 hover:text-rose-700' : 'text-neutral-400 hover:text-brand-purple-700',
+        isLocked ? 'text-rose-600 hover:text-rose-700' : 'text-neutral-400 hover:text-brand-purple-700',
       ].join(' ')}
     >
-      {locked ? <Lock className="w-4 h-4" /> : <LockOpen className="w-4 h-4" />}
+      {isLocked ? <Lock className="w-4 h-4" /> : <LockOpen className="w-4 h-4" />}
     </button>
   );
 }

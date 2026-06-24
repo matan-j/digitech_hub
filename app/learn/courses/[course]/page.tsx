@@ -208,7 +208,7 @@ export default async function CourseLanding({ params }: { params: Promise<{ cour
         {flatLessons.length === 0 ? (
           <div className="p-12 text-center text-neutral-500 text-sm">אין שיעורים בקורס זה.</div>
         ) : hasOnlyDefaultModule ? (
-          <LessonList lessons={course.modules[0].lessons} slug={slug} locked={locked} completed={completed} />
+          <LessonList lessons={course.modules[0].lessons} slug={slug} locked={locked || !!course.modules[0].is_locked} completed={completed} />
         ) : (
           <div className="divide-y divide-neutral-100">
             {course.modules.map((m) => (
@@ -238,6 +238,9 @@ function ModuleSection({
   locked: boolean;
   completed: Set<string>;
 }) {
+  // Hard-locked module (migration 031): blocked for everyone, cascading to every
+  // chapter + lesson under it, regardless of course-level access / purchase.
+  const moduleLocked = !!m.is_locked;
   return (
     <div className="px-6 py-4">
       <div className="flex items-center gap-2 mb-3">
@@ -245,6 +248,7 @@ function ModuleSection({
         <h3 className="text-base font-extrabold text-brand-purple-900">
           מודול {m.num}: {m.title}
         </h3>
+        {moduleLocked && <Lock className="w-3.5 h-3.5 text-neutral-400" aria-label="מודול נעול" />}
       </div>
       {m.body && (
         <div
@@ -256,9 +260,9 @@ function ModuleSection({
       {m.chapters.length > 0 && (
         <div className="space-y-3">
           {m.chapters.map((c) => {
-            // Hard-locked chapter (migration 029): blocked for everyone, even
-            // with course access. Show it locked regardless of course-level access.
-            const chapterLocked = !!c.is_locked;
+            // Hard-locked chapter (migration 029) — or inherited from a locked
+            // module. Blocked for everyone, even with course access.
+            const chapterLocked = moduleLocked || !!c.is_locked;
             return (
               <div key={c.id}>
                 <div className="flex items-center gap-2 mb-2">
@@ -277,7 +281,7 @@ function ModuleSection({
 
       {m.lessons.length > 0 && (
         <div className={m.chapters.length > 0 ? 'mt-3' : ''}>
-          <LessonList lessons={m.lessons} slug={slug} locked={locked} completed={completed} compact />
+          <LessonList lessons={m.lessons} slug={slug} locked={locked || moduleLocked} completed={completed} compact />
         </div>
       )}
     </div>
@@ -301,9 +305,12 @@ function LessonList({
     <ul className={compact ? 'rounded-md border border-neutral-100 overflow-hidden' : ''}>
       {lessons.map((l) => {
         const isDone = completed.has(l.id);
+        // Effective lock: course/module/chapter lock (passed in) OR this single
+        // lesson's own hard lock (migration 031).
+        const lessonLocked = locked || !!l.is_locked;
         // Locked lessons send the viewer back to the course header, where the
         // access-aware CTA (enroll / purchase / subscribe) lives.
-        const url = locked ? `/learn/courses/${slug}` : `/learn/courses/${slug}/${l.slug}`;
+        const url = lessonLocked ? `/learn/courses/${slug}` : `/learn/courses/${slug}/${l.slug}`;
         return (
           <li key={l.id} className="border-t border-neutral-100 first:border-t-0">
             <Link
@@ -322,7 +329,7 @@ function LessonList({
                 <p className="font-semibold text-neutral-900 text-sm truncate">{l.title}</p>
                 {l.duration && <p className="text-xs text-neutral-500 mt-0.5">{l.duration}</p>}
               </div>
-              {locked ? (
+              {lessonLocked ? (
                 <Lock className="w-4 h-4 text-neutral-400" />
               ) : (
                 <ArrowLeft className="w-4 h-4 text-neutral-400" />

@@ -23,13 +23,30 @@
 --   runs with the service key.
 --   Idempotent — safe to re-run.
 
+-- DROP first: an earlier revision returned text[]; CREATE OR REPLACE cannot
+-- change a function's return type, so we drop and recreate. Idempotent.
+drop function if exists public.email_auth_providers(text);
+
+-- Returns { "providers": ["email","google",...], "has_password": bool }.
+--   providers     — distinct auth providers linked to the email (one account may
+--                   have several; 'email' covers BOTH password and OTP/magic-link
+--                   identities, so it does NOT by itself imply a password).
+--   has_password  — whether a real password is set (encrypted_password present).
+--                   This is the only reliable "can log in with a password" signal;
+--                   the 'email' provider alone is not.
 create or replace function public.email_auth_providers(p_email text)
-returns text[]
+returns jsonb
 language sql
 security definer
 set search_path = public, auth
 as $$
-  select coalesce(array_agg(distinct i.provider), '{}')
+  select jsonb_build_object(
+    'providers',
+      coalesce(array_agg(distinct i.provider), array[]::text[]),
+    'has_password',
+      coalesce(bool_or(u.encrypted_password is not null
+                       and length(u.encrypted_password) > 0), false)
+  )
   from auth.users u
   join auth.identities i on i.user_id = u.id
   where lower(u.email) = lower(trim(p_email));

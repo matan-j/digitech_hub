@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
 
-const UPDATABLE = ['title', 'vimeo_id', 'duration', 'body', 'num', 'slug', 'module_id', 'chapter_id', 'is_preview'] as const;
+const UPDATABLE = ['title', 'vimeo_id', 'duration', 'body', 'num', 'slug', 'module_id', 'chapter_id', 'is_preview', 'is_locked'] as const;
 
 export async function PUT(request: Request, ctx: { params: Promise<{ id: string }> }) {
   await requireAdmin();

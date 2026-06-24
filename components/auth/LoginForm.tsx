@@ -179,7 +179,7 @@ export default function LoginForm({ returnTo }: { returnTo?: string }) {
         // Cross-provider guard: never mint a second account for an email that
         // already exists under another method — steer the user to it instead.
         const existing = await lookupEmailProviders(email);
-        if (existing.hasGoogle && !existing.hasPassword) {
+        if (existing.hasGoogle) {
           setLoading(null);
           setError('המייל הזה כבר רשום דרך Google. התחבר עם הכפתור "התחברות עם Google" למעלה.');
           return;
@@ -210,7 +210,7 @@ export default function LoginForm({ returnTo }: { returnTo?: string }) {
 
       // reset mode
       const redirect = new URL('/auth/callback', window.location.origin);
-      redirect.searchParams.set('next', '/account');
+      redirect.searchParams.set('next', '/learn/account');
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: redirect.toString(),
       });

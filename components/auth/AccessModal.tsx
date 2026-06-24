@@ -153,10 +153,10 @@ export default function AccessModal({ open, request, onClose }: Props) {
 
     setLoading('email');
 
-    // Cross-provider guard: if this email already belongs to a Google account,
+    // Cross-provider guard: if this email is registered with Google at all,
     // sending a code would bypass it — steer the user back to Google instead.
     const existing = await lookupEmailProviders(email.trim());
-    if (existing.hasGoogle && !existing.hasPassword) {
+    if (existing.hasGoogle) {
       setLoading(null);
       setError('המייל הזה כבר רשום דרך Google. השתמש בכפתור "המשך עם Google" למעלה.');
       return;
