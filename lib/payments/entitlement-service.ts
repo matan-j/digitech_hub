@@ -61,6 +61,10 @@ export async function hasActiveEntitlement(
     .eq('resource_type', resourceType)
     .eq('resource_id', resourceId)
     .eq('status', 'active')
+    // Mirror the DB's has_entitlement(): an entitlement with a past expires_at is
+    // NOT active. Without this the app could render an unlocked lesson link that
+    // the RLS read then rejects → 404.
+    .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
     .maybeSingle();
   return !!data;
 }
@@ -81,7 +85,9 @@ export async function listOwnedResourceIds(resourceType: ResourceType): Promise<
     .select('resource_id')
     .eq('user_id', user.id)
     .eq('resource_type', resourceType)
-    .eq('status', 'active');
+    .eq('status', 'active')
+    // Mirror the DB's has_entitlement() expiry check (see hasActiveEntitlement).
+    .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`);
   return new Set((data ?? []).map((r) => (r as { resource_id: string }).resource_id));
 }
 

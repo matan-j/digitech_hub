@@ -7,7 +7,7 @@ import ContentTableOfContents from '@/components/learn/ContentTableOfContents';
 import { toRichBlocks, extractToc } from '@/lib/learn/rich-content';
 import { getCurrentUser, hasPremiumAccess } from '@/lib/auth';
 import { hasActiveEntitlement } from '@/lib/payments/entitlement-service';
-import { getCompletedLessonIds, getCourseWithLessons } from '@/lib/learn/db';
+import { getCompletedLessonIds, getCourseWithLessons, getCourseWithModules } from '@/lib/learn/db';
 import VimeoPlayer from '@/components/learn/VimeoPlayer';
 import CourseSidebar from '@/components/learn/CourseSidebar';
 import ResourcesCard from '@/components/learn/ResourcesCard';
@@ -23,7 +23,18 @@ export default async function LessonPage({
 }) {
   const { course: courseSlug, lesson: lessonSlug } = await params;
   const data = await getLesson(courseSlug, lessonSlug);
-  if (!data) notFound();
+  if (!data) {
+    // getLesson reads the RLS-gated base tables only. A null result can mean the
+    // course/lesson genuinely doesn't exist OR the viewer simply lacks DB-level
+    // access (e.g. a purchase_required course they haven't bought yet). Don't
+    // hard-404 the latter: if the course exists in the public metadata view,
+    // send them to the landing where the login/purchase gate + CTA live — the
+    // same fallback the course landing page itself uses. Only a truly missing
+    // course is a real 404.
+    const publicCourse = await getCourseWithModules(courseSlug, { source: 'public' });
+    if (publicCourse) redirect(`/learn/courses/${courseSlug}`);
+    notFound();
+  }
   const { course, lesson, prev, next, lessonId, isPremium, accessLevel, courseId, isPreviewLesson, hardLocked } = data;
 
   // Hierarchical HARD lock (migrations 029/031): blocked for EVERYONE — owners,
@@ -40,10 +51,13 @@ export default async function LessonPage({
   const returnTo = `/learn/courses/${courseSlug}/${lessonSlug}`;
   const auth = await getCurrentUser();
 
-  // Legacy subscription gate (is_premium / subscription_required).
+  // Legacy subscription gate (is_premium / subscription_required). An active
+  // per-course entitlement (purchase / admin / gift) bypasses the premium lock
+  // just like a live subscription — mirroring has_content_access() in the DB.
   if (isPremium) {
     if (!auth) redirect(`/login?return=${encodeURIComponent(returnTo)}`);
-    if (!hasPremiumAccess(auth.profile)) {
+    const entitled = hasPremiumAccess(auth.profile) || (await hasActiveEntitlement('course', courseId));
+    if (!entitled) {
       redirect(`/upgrade?return=${encodeURIComponent(returnTo)}`);
     }
   }
