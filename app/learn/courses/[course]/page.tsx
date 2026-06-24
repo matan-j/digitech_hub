@@ -8,6 +8,7 @@ import { decideAccess, resolveAccessLevel, formatPrice } from '@/lib/learn/acces
 import { hasActiveEntitlement } from '@/lib/payments/entitlement-service';
 import AccessActionButton from '@/components/learn/AccessActionButton';
 import type { DbLesson, ModuleWithChildren } from '@/lib/learn/types';
+import ShareButton from '@/components/learn/ShareButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -101,6 +102,9 @@ export default async function CourseLanding({ params }: { params: Promise<{ cour
                 פרימיום
               </span>
             )}
+            <span className="ms-auto">
+              <ShareButton path={`/learn/courses/${slug}`} title={course.title} />
+            </span>
           </div>
 
           <div className="mt-6">
