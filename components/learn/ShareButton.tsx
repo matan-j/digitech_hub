@@ -35,7 +35,11 @@ export default function ShareButton({
   variant?: Variant;
 }) {
   const [open, setOpen] = useState(false);
-  const [coords, setCoords] = useState<{ top: number; right: number }>({ top: 0, right: 0 });
+  const [coords, setCoords] = useState<{ top: number; left: number; up: boolean }>({
+    top: 0,
+    left: 0,
+    up: false,
+  });
   const [url, setUrl] = useState<string | null>(null);
   const [status, setStatus] = useState<LinkStatus>('idle');
   const [copied, setCopied] = useState(false);
@@ -71,12 +75,16 @@ export default function ShareButton({
     }
     const rect = btnRef.current?.getBoundingClientRect();
     if (rect) {
-      // Anchor the menu's right edge to the button (RTL), flipping above the
-      // button if there isn't room below.
+      // Prefer aligning the menu's right edge to the button (RTL), but clamp
+      // into the viewport so it never spills off-screen — on mobile the button
+      // sits near the left edge, so the menu opens rightward instead.
       const openUp = rect.bottom + 280 > window.innerHeight && rect.top > 280;
+      const maxLeft = Math.max(8, window.innerWidth - MENU_WIDTH - 8);
+      const left = Math.min(Math.max(8, rect.right - MENU_WIDTH), maxLeft);
       setCoords({
         top: openUp ? rect.top - 8 : rect.bottom + 8,
-        right: Math.max(8, window.innerWidth - rect.right),
+        left,
+        up: openUp,
       });
     }
     setCopied(false);
@@ -183,7 +191,13 @@ export default function ShareButton({
             role="menu"
             dir="rtl"
             className="fixed z-[60] rounded-card border border-neutral-200 bg-white py-1.5 text-right"
-            style={{ top: coords.top, right: coords.right, width: MENU_WIDTH, boxShadow: 'var(--shadow-card)' }}
+            style={{
+              top: coords.top,
+              left: coords.left,
+              width: MENU_WIDTH,
+              transform: coords.up ? 'translateY(-100%)' : undefined,
+              boxShadow: 'var(--shadow-card)',
+            }}
           >
             <p className="px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-neutral-400">שיתוף</p>
 
