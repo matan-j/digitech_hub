@@ -7,8 +7,9 @@ import FileUpload from './FileUpload';
 import SaveIndicator, { type SaveState } from './SaveIndicator';
 import YouTubeField from './YouTubeField';
 import CategoriesPicker from './CategoriesPicker';
+import AccessControlFields from './AccessControlFields';
 import { DOMAINS, type DomainId, isDomainId } from '@/lib/learn/domains';
-import type { Playbook } from '@/lib/learn/types';
+import type { AccessLevel, CatalogVisibility, Playbook } from '@/lib/learn/types';
 
 type Props = { initial: Playbook };
 
@@ -27,6 +28,10 @@ export default function PlaybookEditor({ initial }: Props) {
   const [isPremium, setIsPremium] = useState(initial.is_premium);
   const [status, setStatus] = useState(initial.status);
   const [htmlContent, setHtmlContent] = useState(initial.html_content ?? '');
+  // Access model (migration 018)
+  const [accessLevel, setAccessLevel] = useState<AccessLevel>(initial.access_level ?? 'open');
+  const [catalogVisibility, setCatalogVisibility] = useState<CatalogVisibility>(initial.catalog_visibility ?? 'public');
+  const [previewEnabled, setPreviewEnabled] = useState(initial.preview_enabled ?? false);
   const [saveState, setSaveState] = useState<SaveState>('idle');
   const dirty = useRef(false);
   const saveTimer = useRef<NodeJS.Timeout | null>(null);
@@ -68,6 +73,9 @@ export default function PlaybookEditor({ initial }: Props) {
       category_ids: categoryIds,
       is_premium: isPremium,
       html_content: htmlContent,
+      access_level: accessLevel,
+      catalog_visibility: catalogVisibility,
+      preview_enabled: previewEnabled,
       ...extra,
     };
   }
@@ -83,7 +91,7 @@ export default function PlaybookEditor({ initial }: Props) {
       persist(buildPayload());
     }, 1200);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [title, tagline, description, audience, coverUrl, videoUrl, domain, categoryIds, isPremium, htmlContent]);
+  }, [title, tagline, description, audience, coverUrl, videoUrl, domain, categoryIds, isPremium, htmlContent, accessLevel, catalogVisibility, previewEnabled]);
 
   useEffect(() => () => {
     if (saveTimer.current) clearTimeout(saveTimer.current);
@@ -237,6 +245,15 @@ export default function PlaybookEditor({ initial }: Props) {
           </div>
         </div>
       </section>
+
+      <AccessControlFields
+        accessLevel={accessLevel}
+        onAccessLevel={setAccessLevel}
+        catalogVisibility={catalogVisibility}
+        onCatalogVisibility={setCatalogVisibility}
+        previewEnabled={previewEnabled}
+        onPreviewEnabled={setPreviewEnabled}
+      />
 
       <section className="bg-white rounded-2xl border border-neutral-200 p-5">
         <h2 className="text-sm font-extrabold text-neutral-700 uppercase tracking-wide mb-3">מטא-דאטה</h2>

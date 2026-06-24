@@ -1,8 +1,10 @@
 import Link from 'next/link';
-import { notFound, redirect } from 'next/navigation';
-import { ArrowRight } from 'lucide-react';
+import { notFound } from 'next/navigation';
+import { ArrowRight, Lock } from 'lucide-react';
 import { getPlaybook, getPlaybookBySlug } from '@/lib/learn/db';
 import { getCurrentUser, hasPremiumAccess } from '@/lib/auth';
+import { decideAccess, gateCtaLabel, type GateReason } from '@/lib/learn/access';
+import AccessActionButton from '@/components/learn/AccessActionButton';
 import { DOMAIN_BY_ID, domainBadgeClasses, domainDotClasses } from '@/lib/learn/domains';
 import { youtubeIdFromUrl, youtubeEmbedUrl } from '@/lib/learn/youtube';
 
@@ -33,13 +35,14 @@ export default async function PlaybookViewer({ params }: { params: Promise<{ id:
   const isAdmin = auth?.profile.role === 'admin';
   if (!isAdmin && playbook.status !== 'published') notFound();
 
-  if (playbook.is_premium) {
-    const returnPath = `/learn/playbooks/${playbook.slug ?? playbook.id}`;
-    if (!auth) redirect(`/login?return=${encodeURIComponent(returnPath)}`);
-    if (!hasPremiumAccess(auth.profile)) {
-      redirect(`/upgrade?return=${encodeURIComponent(returnPath)}`);
-    }
-  }
+  // Public-first: never redirect. Decide full / preview / locked from the
+  // access model (admins always get full via hasPremiumAccess).
+  const decision = decideAccess(playbook, {
+    loggedIn: !!auth,
+    hasPremium: !!auth && hasPremiumAccess(auth.profile),
+  });
+  const showFull = decision.state === 'full';
+  const slugOrId = playbook.slug ?? playbook.id;
 
   const ytId = youtubeIdFromUrl(playbook.video_url);
   const domainMeta = playbook.domain ? DOMAIN_BY_ID[playbook.domain] : null;
@@ -49,7 +52,7 @@ export default async function PlaybookViewer({ params }: { params: Promise<{ id:
   // the legacy viewer (raw HTML iframe full-bleed) so they still render correctly.
   const isLegacyAutoGen = !ytId && !cover && !playbook.tagline && !playbook.description && !playbook.domain;
 
-  if (isLegacyAutoGen && hasHtml) {
+  if (isLegacyAutoGen && hasHtml && showFull) {
     return (
       <div className="min-h-screen bg-white">
         <iframe
@@ -118,9 +121,11 @@ export default async function PlaybookViewer({ params }: { params: Promise<{ id:
             </p>
           )}
         </header>
+
+        {!showFull && <PlaybookGate reason={decision.reason} slugOrId={slugOrId} />}
       </article>
 
-      {hasHtml && (
+      {showFull && hasHtml && (
         <iframe
           title={playbook.title}
           sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
@@ -128,6 +133,36 @@ export default async function PlaybookViewer({ params }: { params: Promise<{ id:
           className="w-full min-h-[80vh] border-0 border-t border-neutral-200"
         />
       )}
+    </div>
+  );
+}
+
+/** Access gate for login/subscription-gated playbooks. */
+function PlaybookGate({ reason, slugOrId }: { reason: GateReason; slugOrId: string }) {
+  const returnTo = `/learn/playbooks/${slugOrId}`;
+  // Playbooks are not priced in content_items (V1), so a 'purchase' gate falls
+  // back to the subscription path; in practice the 018 backfill maps premium
+  // playbooks to subscription_required.
+  const kind = reason === 'login' ? 'login' : 'subscribe';
+  return (
+    <div
+      className="rounded-2xl border border-neutral-200 bg-white p-8 text-center mt-2"
+      style={{ boxShadow: 'var(--shadow-card)' }}
+    >
+      <div className="w-12 h-12 mx-auto mb-4 rounded-pill bg-brand-purple-50 flex items-center justify-center text-brand-purple-600">
+        <Lock className="w-6 h-6" />
+      </div>
+      <h2 className="text-lg font-extrabold text-neutral-950 mb-1.5">הפלייבוק המלא דורש גישה</h2>
+      <p className="text-sm text-neutral-500 max-w-sm mx-auto mb-6">
+        קבלו גישה מלאה לפלייבוק הזה ולכל הספרייה.
+      </p>
+      <AccessActionButton
+        kind={kind}
+        slug={slugOrId}
+        returnTo={returnTo}
+        label={gateCtaLabel(reason)}
+        className="inline-flex items-center gap-2 px-5 py-2.5 rounded-pill bg-brand-purple-700 hover:bg-brand-purple-600 text-white text-sm font-bold transition-colors disabled:opacity-70"
+      />
     </div>
   );
 }

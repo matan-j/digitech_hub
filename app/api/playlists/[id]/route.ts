@@ -11,6 +11,8 @@ const BASE_FIELDS = [
   'seo_title',
   'seo_description',
   'og_image_url',
+  // Access model (migration 018)
+  'catalog_visibility',
 ] as const;
 const ADMIN_ONLY = ['is_featured', 'sort_order'] as const;
 

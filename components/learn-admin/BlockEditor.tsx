@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { GripVertical, Trash2, Plus, Image as ImageIcon, Type, Video, Info } from 'lucide-react';
 import FileUpload from './FileUpload';
+import MarkdownEditor from './MarkdownEditor';
 import type { GuideBlock } from '@/lib/learn/types';
 
 type Props = {
@@ -77,12 +78,10 @@ export default function BlockEditor({ value, onChange }: Props) {
 
           <div className="p-3">
             {block.type === 'markdown' && (
-              <textarea
+              <MarkdownEditor
                 value={block.content}
-                onChange={(e) => updateAt(idx, { type: 'markdown', content: e.target.value })}
-                placeholder="כתוב כאן markdown..."
-                rows={6}
-                className="w-full px-3 py-2 rounded-md border border-neutral-200 focus:border-brand-purple-400 focus:outline-none text-sm font-mono leading-relaxed"
+                onChange={(next) => updateAt(idx, { type: 'markdown', content: next })}
+                rows={8}
               />
             )}
 

@@ -4,6 +4,9 @@ import { ArrowLeft, ArrowRight, Clock, Lock, Play, Check, Folder, BookOpen } fro
 import { getCourseWithModules, getCompletedLessonIds } from '@/lib/learn/db';
 import { getCurrentUser, hasPremiumAccess } from '@/lib/auth';
 import { renderMarkdownLite } from '@/lib/learn/markdown';
+import { decideAccess, resolveAccessLevel, formatPrice } from '@/lib/learn/access';
+import { hasActiveEntitlement } from '@/lib/payments/entitlement-service';
+import AccessActionButton from '@/components/learn/AccessActionButton';
 import type { DbLesson, ModuleWithChildren } from '@/lib/learn/types';
 
 export const dynamic = 'force-dynamic';
@@ -30,7 +33,13 @@ export default async function CourseLanding({ params }: { params: Promise<{ cour
   if (!course || course.status !== 'published') notFound();
 
   const auth = await getCurrentUser();
-  const locked = course.is_premium && (!auth || !hasPremiumAccess(auth.profile));
+  const hasPremium = !!auth && hasPremiumAccess(auth.profile);
+  const level = resolveAccessLevel(course);
+  const hasEntitlement =
+    level === 'purchase_required' && !!auth ? await hasActiveEntitlement('course', course.id) : false;
+  const decision = decideAccess(course, { loggedIn: !!auth, hasPremium, hasEntitlement });
+  const full = decision.state === 'full';
+  const locked = !full;
 
   const flatLessons = flattenLessons(course.modules);
   const completed = auth ? new Set(await getCompletedLessonIds(auth.userId, course.id)) : new Set<string>();
@@ -96,23 +105,68 @@ export default async function CourseLanding({ params }: { params: Promise<{ cour
 
           <div className="mt-6">
             {targetLesson ? (
-              locked ? (
-                <Link
-                  href={auth ? `/upgrade?return=${encodeURIComponent(`/learn/courses/${slug}`)}` : `/login?return=${encodeURIComponent(`/learn/courses/${slug}`)}`}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-pill bg-white text-brand-purple-800 text-sm font-bold hover:bg-brand-purple-50 transition-colors"
-                >
-                  <Lock className="w-4 h-4" />
-                  {auth ? 'הצטרף למועדון' : 'התחבר כדי לצפות'}
-                </Link>
-              ) : (
-                <Link
-                  href={`/learn/courses/${slug}/${targetLesson.slug}`}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-pill bg-white text-brand-purple-800 text-sm font-bold hover:bg-brand-purple-50 transition-colors"
-                >
-                  <Play className="w-4 h-4" />
-                  {completedCount > 0 ? 'המשך לימוד' : 'התחל קורס'}
-                </Link>
-              )
+              (() => {
+                const returnTo = `/learn/courses/${slug}`;
+                const targetHref = `/learn/courses/${slug}/${targetLesson.slug}`;
+                const btnCls =
+                  'inline-flex items-center gap-2 px-5 py-2.5 rounded-pill bg-white text-brand-purple-800 text-sm font-bold hover:bg-brand-purple-50 transition-colors disabled:opacity-70';
+                const errCls = 'text-xs text-red-200 mt-1.5';
+                // Full access (open, enrolled, premium, or entitled) → straight in.
+                if (full) {
+                  return (
+                    <AccessActionButton
+                      kind={level === 'open' || level === 'login_required' ? 'enroll' : 'continue'}
+                      slug={slug}
+                      returnTo={returnTo}
+                      targetHref={targetHref}
+                      label={completedCount > 0 ? 'המשך לימוד' : 'התחל קורס'}
+                      className={btnCls}
+                      errorClassName={errCls}
+                      icon={<Play className="w-4 h-4" />}
+                    />
+                  );
+                }
+                if (level === 'purchase_required') {
+                  const price = formatPrice(course.price_amount, course.price_currency);
+                  return (
+                    <AccessActionButton
+                      kind="purchase"
+                      slug={slug}
+                      contentType="course"
+                      returnTo={returnTo}
+                      label={price ? `רכישת גישה · ${price}` : 'רכישת גישה לקורס'}
+                      className={btnCls}
+                      errorClassName={errCls}
+                      icon={<Lock className="w-4 h-4" />}
+                    />
+                  );
+                }
+                if (level === 'subscription_required') {
+                  return (
+                    <AccessActionButton
+                      kind="subscribe"
+                      slug={slug}
+                      returnTo={returnTo}
+                      label="הצטרפות למועדון"
+                      className={btnCls}
+                      errorClassName={errCls}
+                      icon={<Lock className="w-4 h-4" />}
+                    />
+                  );
+                }
+                // login_required without a session → register to unlock.
+                return (
+                  <AccessActionButton
+                    kind="login"
+                    slug={slug}
+                    returnTo={returnTo}
+                    label="פתיחת גישה חינמית"
+                    className={btnCls}
+                    errorClassName={errCls}
+                    icon={<Play className="w-4 h-4" />}
+                  />
+                );
+              })()
             ) : (
               <p className="text-sm text-brand-purple-200">קורס זה עוד ריק.</p>
             )}
@@ -134,7 +188,7 @@ export default async function CourseLanding({ params }: { params: Promise<{ cour
         {flatLessons.length === 0 ? (
           <div className="p-12 text-center text-neutral-500 text-sm">אין שיעורים בקורס זה.</div>
         ) : hasOnlyDefaultModule ? (
-          <LessonList lessons={course.modules[0].lessons} slug={slug} locked={locked} auth={!!auth} completed={completed} />
+          <LessonList lessons={course.modules[0].lessons} slug={slug} locked={locked} completed={completed} />
         ) : (
           <div className="divide-y divide-neutral-100">
             {course.modules.map((m) => (
@@ -143,7 +197,6 @@ export default async function CourseLanding({ params }: { params: Promise<{ cour
                 module={m}
                 slug={slug}
                 locked={locked}
-                auth={!!auth}
                 completed={completed}
               />
             ))}
@@ -158,13 +211,11 @@ function ModuleSection({
   module: m,
   slug,
   locked,
-  auth,
   completed,
 }: {
   module: ModuleWithChildren;
   slug: string;
   locked: boolean;
-  auth: boolean;
   completed: Set<string>;
 }) {
   return (
@@ -192,7 +243,7 @@ function ModuleSection({
                   פרק {c.num}: {c.title}
                 </h4>
               </div>
-              <LessonList lessons={c.lessons} slug={slug} locked={locked} auth={auth} completed={completed} compact />
+              <LessonList lessons={c.lessons} slug={slug} locked={locked} completed={completed} compact />
             </div>
           ))}
         </div>
@@ -200,7 +251,7 @@ function ModuleSection({
 
       {m.lessons.length > 0 && (
         <div className={m.chapters.length > 0 ? 'mt-3' : ''}>
-          <LessonList lessons={m.lessons} slug={slug} locked={locked} auth={auth} completed={completed} compact />
+          <LessonList lessons={m.lessons} slug={slug} locked={locked} completed={completed} compact />
         </div>
       )}
     </div>
@@ -211,14 +262,12 @@ function LessonList({
   lessons,
   slug,
   locked,
-  auth,
   completed,
   compact = false,
 }: {
   lessons: DbLesson[];
   slug: string;
   locked: boolean;
-  auth: boolean;
   completed: Set<string>;
   compact?: boolean;
 }) {
@@ -226,9 +275,9 @@ function LessonList({
     <ul className={compact ? 'rounded-md border border-neutral-100 overflow-hidden' : ''}>
       {lessons.map((l) => {
         const isDone = completed.has(l.id);
-        const url = locked
-          ? (auth ? `/upgrade?return=${encodeURIComponent(`/learn/courses/${slug}/${l.slug}`)}` : `/login?return=${encodeURIComponent(`/learn/courses/${slug}/${l.slug}`)}`)
-          : `/learn/courses/${slug}/${l.slug}`;
+        // Locked lessons send the viewer back to the course header, where the
+        // access-aware CTA (enroll / purchase / subscribe) lives.
+        const url = locked ? `/learn/courses/${slug}` : `/learn/courses/${slug}/${l.slug}`;
         return (
           <li key={l.id} className="border-t border-neutral-100 first:border-t-0">
             <Link

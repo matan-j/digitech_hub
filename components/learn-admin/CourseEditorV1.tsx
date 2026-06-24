@@ -8,7 +8,10 @@ import FileUpload from './FileUpload';
 import SaveIndicator, { type SaveState } from './SaveIndicator';
 import GeneratePlaybookButton from './GeneratePlaybookButton';
 import NodeEditor, { type MoveTarget } from './NodeEditor';
+import AccessControlFields from './AccessControlFields';
 import type {
+  AccessLevel,
+  CatalogVisibility,
   ChapterWithLessons,
   CourseWithModules,
   DbChapter,
@@ -42,6 +45,12 @@ export default function CourseEditorV1({ initial }: Props) {
   const [coverUrl, setCoverUrl] = useState(initial.cover_url ?? '');
   const [isPremium, setIsPremium] = useState(initial.is_premium);
   const [status, setStatus] = useState(initial.status);
+  // Access model (migration 018)
+  const [accessLevel, setAccessLevel] = useState<AccessLevel>(initial.access_level ?? 'open');
+  const [catalogVisibility, setCatalogVisibility] = useState<CatalogVisibility>(initial.catalog_visibility ?? 'public');
+  const [previewEnabled, setPreviewEnabled] = useState(initial.preview_enabled ?? false);
+  const [priceAmount, setPriceAmount] = useState<string>(initial.price_amount != null ? String(initial.price_amount) : '');
+  const [priceCurrency, setPriceCurrency] = useState(initial.price_currency ?? 'ILS');
   const [saveState, setSaveState] = useState<SaveState>('idle');
   const [modules, setModules] = useState<ModuleWithChildren[]>(initial.modules);
   const [newModuleTitle, setNewModuleTitle] = useState('');
@@ -49,6 +58,21 @@ export default function CourseEditorV1({ initial }: Props) {
   const dragState = useRef<DragState>(null);
   const dirty = useRef(false);
   const saveTimer = useRef<NodeJS.Timeout | null>(null);
+
+  const buildMeta = useCallback((extra?: Record<string, unknown>) => ({
+    title,
+    tagline: tagline || null,
+    description: description || null,
+    audience: audience || null,
+    cover_url: coverUrl || null,
+    is_premium: isPremium,
+    access_level: accessLevel,
+    catalog_visibility: catalogVisibility,
+    preview_enabled: previewEnabled,
+    price_amount: accessLevel === 'purchase_required' && priceAmount ? Number(priceAmount) : null,
+    price_currency: priceCurrency,
+    ...extra,
+  }), [title, tagline, description, audience, coverUrl, isPremium, accessLevel, catalogVisibility, previewEnabled, priceAmount, priceCurrency]);
 
   const persist = useCallback(async (payload: Record<string, unknown>) => {
     setSaveState('saving');
@@ -73,17 +97,10 @@ export default function CourseEditorV1({ initial }: Props) {
     setSaveState('dirty');
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
-      persist({
-        title,
-        tagline: tagline || null,
-        description: description || null,
-        audience: audience || null,
-        cover_url: coverUrl || null,
-        is_premium: isPremium,
-      });
+      persist(buildMeta());
     }, 1200);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [title, tagline, description, audience, coverUrl, isPremium]);
+  }, [title, tagline, description, audience, coverUrl, isPremium, accessLevel, catalogVisibility, previewEnabled, priceAmount, priceCurrency]);
 
   useEffect(() => () => {
     if (saveTimer.current) clearTimeout(saveTimer.current);
@@ -91,15 +108,7 @@ export default function CourseEditorV1({ initial }: Props) {
 
   async function togglePublish() {
     const next = status === 'published' ? 'draft' : 'published';
-    const ok = await persist({
-      title,
-      tagline: tagline || null,
-      description: description || null,
-      audience: audience || null,
-      cover_url: coverUrl || null,
-      is_premium: isPremium,
-      status: next,
-    });
+    const ok = await persist(buildMeta({ status: next }));
     if (ok) setStatus(next);
   }
 
@@ -526,6 +535,19 @@ export default function CourseEditorV1({ initial }: Props) {
           </div>
         </div>
       </section>
+
+      <AccessControlFields
+        accessLevel={accessLevel}
+        onAccessLevel={setAccessLevel}
+        catalogVisibility={catalogVisibility}
+        onCatalogVisibility={setCatalogVisibility}
+        previewEnabled={previewEnabled}
+        onPreviewEnabled={setPreviewEnabled}
+        priceAmount={priceAmount}
+        onPriceAmount={setPriceAmount}
+        priceCurrency={priceCurrency}
+        onPriceCurrency={setPriceCurrency}
+      />
 
       <section className="bg-white rounded-2xl border border-neutral-200 p-5">
         <h2 className="text-sm font-extrabold text-neutral-700 uppercase tracking-wide mb-4">

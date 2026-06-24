@@ -1,5 +1,6 @@
 import NavSidebar from '@/components/learn/NavSidebar';
 import MobileTopBar from '@/components/learn/MobileTopBar';
+import AccessModalProvider from '@/components/auth/AccessModalProvider';
 import { getCurrentUser } from '@/lib/auth';
 import { getBrandSettings } from '@/lib/brand';
 
@@ -10,12 +11,14 @@ export default async function LearnLayout({
 }) {
   const [auth, brand] = await Promise.all([getCurrentUser(), getBrandSettings()]);
   return (
-    <div className="min-h-screen" style={{ backgroundColor: 'var(--color-bg-main)' }}>
-      <NavSidebar auth={auth} brand={brand} />
-      <MobileTopBar auth={auth} logoUrl={brand.logoUrl} />
-      <main className="lg:mr-64 pt-14 lg:pt-0 min-h-screen">
-        {children}
-      </main>
-    </div>
+    <AccessModalProvider initialAuthed={Boolean(auth)}>
+      <div className="min-h-screen" style={{ backgroundColor: 'var(--color-bg-main)' }}>
+        <NavSidebar auth={auth} brand={brand} />
+        <MobileTopBar auth={auth} logoUrl={brand.logoUrl} />
+        <main className="lg:mr-64 pt-14 lg:pt-0 min-h-screen">
+          {children}
+        </main>
+      </div>
+    </AccessModalProvider>
   );
 }

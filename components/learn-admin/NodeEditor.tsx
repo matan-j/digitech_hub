@@ -283,8 +283,8 @@ export default function NodeEditor(props: Props) {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-neutral-600 mb-1">תוכן (Markdown, אופציונלי)</label>
-            <MarkdownEditor value={body} onChange={setBody} rows={8} />
+            <label className="block text-xs font-semibold text-neutral-600 mb-1">תוכן (טקסט עשיר, אופציונלי)</label>
+            <MarkdownEditor value={body} onChange={setBody} rows={8} showTimestamp />
           </div>
 
           <div>

@@ -5,6 +5,17 @@ import { resolveWriteActor, validateContentUrl, type WriteActor } from '@/lib/le
 
 const VALID_TYPES: ContentType[] = ['course', 'guide'];
 
+/** Normalize a user-edited slug to safe URL form (empty string if nothing usable). */
+function normalizeSlug(input: string): string {
+  return input
+    .normalize('NFKD')
+    .toLowerCase()
+    .replace(/[֐-׿]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 60);
+}
+
 // Fields a creator OR admin may update.
 const BASE_FIELDS = [
   'title',
@@ -25,6 +36,12 @@ const BASE_FIELDS = [
   'seo_title',
   'seo_description',
   'og_image_url',
+  // Access model (migration 018)
+  'catalog_visibility',
+  'access_level',
+  'preview_enabled',
+  'price_amount',
+  'price_currency',
 ] as const;
 
 // Admin-only fields.
@@ -73,6 +90,25 @@ export async function PUT(request: Request, ctx: { params: Promise<{ type: strin
   const update: Record<string, unknown> = {};
   for (const field of BASE_FIELDS) {
     if (field in body) update[field] = body[field];
+  }
+
+  // Slug change (URL identifier) — validated + uniqueness-checked separately.
+  if (typeof body.slug === 'string') {
+    const desired = normalizeSlug(body.slug);
+    if (!desired) {
+      return NextResponse.json({ error: 'invalid_slug', message: 'הקישור חייב לכלול אותיות באנגלית או מספרים' }, { status: 400 });
+    }
+    if (desired !== slug) {
+      const { count } = await supabase
+        .from('content_items')
+        .select('id', { count: 'exact', head: true })
+        .eq('type', type)
+        .eq('slug', desired);
+      if ((count ?? 0) > 0) {
+        return NextResponse.json({ error: 'slug_taken', message: 'הקישור הזה כבר תפוס' }, { status: 409 });
+      }
+      update.slug = desired;
+    }
   }
   // Admin-only fields applied only for admins.
   if (actor.kind === 'admin') {

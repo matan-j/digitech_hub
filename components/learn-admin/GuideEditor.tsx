@@ -2,15 +2,17 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Trash2, Eye } from 'lucide-react';
+import { Trash2, Eye, Pencil, Monitor, Smartphone } from 'lucide-react';
+import RichContentRenderer from '@/components/learn/RichContentRenderer';
 import FileUpload from './FileUpload';
 import BlockEditor from './BlockEditor';
 import SaveIndicator, { type SaveState } from './SaveIndicator';
 import YouTubeField from './YouTubeField';
 import VimeoField from './VimeoField';
 import CategoriesPicker from './CategoriesPicker';
+import AccessControlFields from './AccessControlFields';
 import { DOMAINS, type DomainId, isDomainId } from '@/lib/learn/domains';
-import { GUIDE_CONTENT_KINDS, type GuideBlock, type GuideContentKind, type GuideItem } from '@/lib/learn/types';
+import { GUIDE_CONTENT_KINDS, type AccessLevel, type CatalogVisibility, type GuideBlock, type GuideContentKind, type GuideItem } from '@/lib/learn/types';
 import { CONTENT_KIND_LABEL } from '@/lib/learn/placeholder';
 
 type CreatorOption = { id: string; name: string };
@@ -48,8 +50,20 @@ export default function GuideEditor({ initial, mode = 'admin', creators = [], ba
   const [creatorId, setCreatorId] = useState<string>(initial.creator_id ?? '');
   const [isFeatured, setIsFeatured] = useState(initial.is_featured ?? false);
 
+  // Access model (migration 018)
+  const [accessLevel, setAccessLevel] = useState<AccessLevel>(initial.access_level ?? 'open');
+  const [catalogVisibility, setCatalogVisibility] = useState<CatalogVisibility>(initial.catalog_visibility ?? 'public');
+  const [previewEnabled, setPreviewEnabled] = useState(initial.preview_enabled ?? false);
+  const [priceAmount, setPriceAmount] = useState<string>(initial.price_amount != null ? String(initial.price_amount) : '');
+  const [priceCurrency, setPriceCurrency] = useState(initial.price_currency ?? 'ILS');
+
   const [saveState, setSaveState] = useState<SaveState>('idle');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [previewMode, setPreviewMode] = useState(false);
+  const [previewMobile, setPreviewMobile] = useState(false);
+  const [slug, setSlug] = useState(initial.slug);
+  const [slugSaving, setSlugSaving] = useState(false);
+  const [slugError, setSlugError] = useState<string | null>(null);
   const dirty = useRef(false);
   const saveTimer = useRef<NodeJS.Timeout | null>(null);
 
@@ -72,13 +86,18 @@ export default function GuideEditor({ initial, mode = 'admin', creators = [], ba
       seo_title: seoTitle || null,
       seo_description: seoDescription || null,
       og_image_url: ogImageUrl || null,
+      access_level: accessLevel,
+      catalog_visibility: catalogVisibility,
+      preview_enabled: previewEnabled,
+      price_amount: accessLevel === 'purchase_required' && priceAmount ? Number(priceAmount) : null,
+      price_currency: priceCurrency,
     };
     if (mode === 'admin') {
       base.creator_id = creatorId || null;
       base.is_featured = isFeatured;
     }
     return { ...base, ...extra };
-  }, [title, tagline, description, audience, coverUrl, domain, categoryIds, isPremium, blocks, contentKind, contentUrl, duration, seoTitle, seoDescription, ogImageUrl, creatorId, isFeatured, mode]);
+  }, [title, tagline, description, audience, coverUrl, domain, categoryIds, isPremium, blocks, contentKind, contentUrl, duration, seoTitle, seoDescription, ogImageUrl, creatorId, isFeatured, accessLevel, catalogVisibility, previewEnabled, priceAmount, priceCurrency, mode]);
 
   const persist = useCallback(async (payload: Record<string, unknown>) => {
     setSaveState('saving');
@@ -119,7 +138,7 @@ export default function GuideEditor({ initial, mode = 'admin', creators = [], ba
       persist(buildPayload());
     }, 1200);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [title, tagline, description, audience, coverUrl, domain, categoryIds, isPremium, blocks, contentKind, contentUrl, duration, seoTitle, seoDescription, ogImageUrl, creatorId, isFeatured]);
+  }, [title, tagline, description, audience, coverUrl, domain, categoryIds, isPremium, blocks, contentKind, contentUrl, duration, seoTitle, seoDescription, ogImageUrl, creatorId, isFeatured, accessLevel, catalogVisibility, previewEnabled, priceAmount, priceCurrency]);
 
   useEffect(() => () => {
     if (saveTimer.current) clearTimeout(saveTimer.current);
@@ -129,6 +148,32 @@ export default function GuideEditor({ initial, mode = 'admin', creators = [], ba
     const next = status === 'published' ? 'draft' : 'published';
     const ok = await persist(buildPayload({ status: next }));
     if (ok) setStatus(next);
+  }
+
+  async function updateSlug() {
+    const desired = slug.trim();
+    if (!desired || desired === initial.slug) return;
+    setSlugSaving(true);
+    setSlugError(null);
+    try {
+      const res = await fetch(`/api/content/guide/${initial.slug}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug: desired }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setSlugError(data?.message ?? 'שגיאה בעדכון הקישור');
+        setSlugSaving(false);
+        return;
+      }
+      const newSlug = data.item?.slug ?? desired;
+      // The row moved to a new slug — re-point the editor (autosave targets the slug in the URL).
+      router.replace(window.location.pathname.replace(`/${initial.slug}`, `/${newSlug}`));
+    } catch {
+      setSlugError('שגיאת רשת');
+      setSlugSaving(false);
+    }
   }
 
   async function handleDelete() {
@@ -159,15 +204,25 @@ export default function GuideEditor({ initial, mode = 'admin', creators = [], ba
           </div>
           <div className="flex flex-col items-end gap-2">
             <SaveIndicator state={saveState} />
-            <a
-              href={previewHref}
-              target="_blank"
-              rel="noopener"
-              className="flex items-center gap-1 text-xs text-neutral-500 hover:text-brand-purple-700"
-            >
-              <Eye className="w-3.5 h-3.5" />
-              {status === 'published' ? 'צפה במדריך (פורסם)' : 'תצוגה מקדימה (טיוטה)'}
-            </a>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setPreviewMode((v) => !v)}
+                className="flex items-center gap-1 text-xs text-neutral-500 hover:text-brand-purple-700"
+              >
+                {previewMode ? <Pencil className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                {previewMode ? 'חזרה לעריכה' : 'תצוגה מקדימה'}
+              </button>
+              <a
+                href={previewHref}
+                target="_blank"
+                rel="noopener"
+                className="flex items-center gap-1 text-xs text-neutral-500 hover:text-brand-purple-700"
+              >
+                <Eye className="w-3.5 h-3.5" />
+                {status === 'published' ? 'צפה באתר' : 'טיוטה באתר'}
+              </a>
+            </div>
           </div>
         </div>
 
@@ -222,6 +277,25 @@ export default function GuideEditor({ initial, mode = 'admin', creators = [], ba
         </div>
       </header>
 
+      {previewMode ? (
+        <section className="bg-white rounded-2xl border border-neutral-200 overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-3 border-b border-neutral-100 bg-neutral-50">
+            <span className="text-sm font-extrabold text-neutral-700">תצוגה מקדימה — זהה לאתר</span>
+            <div className="flex items-center gap-1">
+              <button type="button" onClick={() => setPreviewMobile(false)} className={`p-1.5 rounded ${!previewMobile ? 'text-brand-purple-700 bg-brand-purple-50' : 'text-neutral-400'}`} aria-label="דסקטופ"><Monitor className="w-4 h-4" /></button>
+              <button type="button" onClick={() => setPreviewMobile(true)} className={`p-1.5 rounded ${previewMobile ? 'text-brand-purple-700 bg-brand-purple-50' : 'text-neutral-400'}`} aria-label="מובייל"><Smartphone className="w-4 h-4" /></button>
+            </div>
+          </div>
+          <div className="p-5 bg-[var(--color-bg-main)]">
+            <article className="mx-auto bg-white rounded-2xl border border-neutral-200 p-6" style={{ maxWidth: previewMobile ? 390 : 760 }}>
+              <h1 className="text-2xl lg:text-3xl font-extrabold text-neutral-950 mb-2 leading-tight" dir="auto">{title || 'כותרת המדריך'}</h1>
+              {tagline && <p className="text-lg text-neutral-600 leading-relaxed mb-6" dir="auto">{tagline}</p>}
+              <RichContentRenderer content={blocks} emptyLabel="אין עדיין תוכן." />
+            </article>
+          </div>
+        </section>
+      ) : (
+      <>
       {/* Content type */}
       <section className="bg-white rounded-2xl border border-neutral-200 p-5">
         <h2 className="text-sm font-extrabold text-neutral-700 uppercase tracking-wide mb-3">סוג תוכן</h2>
@@ -351,6 +425,35 @@ export default function GuideEditor({ initial, mode = 'admin', creators = [], ba
       {/* Metadata + SEO */}
       <section className="bg-white rounded-2xl border border-neutral-200 p-5">
         <h2 className="text-sm font-extrabold text-neutral-700 uppercase tracking-wide mb-3">מטא-דאטה ו-SEO</h2>
+
+        {/* Slug (URL) — editable at any stage */}
+        <div className="mb-4 pb-4 border-b border-neutral-100">
+          <label className="block text-xs font-semibold text-neutral-600 mb-1">כתובת המדריך (Slug)</label>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs text-neutral-400 font-mono" dir="ltr">/learn/guides/</span>
+            <input
+              value={slug}
+              onChange={(e) => { setSlug(e.target.value); setSlugError(null); }}
+              dir="ltr"
+              placeholder="ai-agent-first-build"
+              className="flex-1 min-w-[180px] px-3 py-2 rounded-md border border-neutral-200 focus:border-brand-purple-400 focus:outline-none text-sm font-mono"
+            />
+            <button
+              type="button"
+              onClick={updateSlug}
+              disabled={slugSaving || !slug.trim() || slug.trim() === initial.slug}
+              className="px-3 py-2 rounded-pill text-xs font-semibold bg-brand-purple-700 text-white hover:bg-brand-purple-600 disabled:bg-neutral-300 transition-colors"
+            >
+              {slugSaving ? 'מעדכן…' : 'עדכן קישור'}
+            </button>
+          </div>
+          {slugError ? (
+            <p className="mt-1.5 text-[11px] text-red-600">{slugError}</p>
+          ) : (
+            <p className="mt-1.5 text-[11px] text-amber-600">שינוי הקישור ישבור קישורים קיימים למדריך זה. ניתן לשנות בכל שלב.</p>
+          )}
+        </div>
+
         <div className="grid sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-semibold text-neutral-600 mb-1">תיאור ארוך</label>
@@ -375,12 +478,27 @@ export default function GuideEditor({ initial, mode = 'admin', creators = [], ba
         </div>
       </section>
 
+      <AccessControlFields
+        accessLevel={accessLevel}
+        onAccessLevel={setAccessLevel}
+        catalogVisibility={catalogVisibility}
+        onCatalogVisibility={setCatalogVisibility}
+        previewEnabled={previewEnabled}
+        onPreviewEnabled={setPreviewEnabled}
+        priceAmount={priceAmount}
+        onPriceAmount={setPriceAmount}
+        priceCurrency={priceCurrency}
+        onPriceCurrency={setPriceCurrency}
+      />
+
       <section className="bg-white rounded-2xl border border-neutral-200 p-5">
         <h2 className="text-sm font-extrabold text-neutral-700 uppercase tracking-wide mb-3">
           {contentKind === 'article' ? 'תוכן המדריך' : 'הערות נוספות (אופציונלי)'}
         </h2>
         <BlockEditor value={blocks} onChange={setBlocks} />
       </section>
+      </>
+      )}
     </div>
   );
 }

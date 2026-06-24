@@ -70,13 +70,16 @@ export default function NewGuideForm() {
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 
-      <button
-        type="submit"
-        disabled={loading || !title.trim()}
-        className="px-4 py-2.5 rounded-pill bg-brand-purple-700 hover:bg-brand-purple-600 disabled:bg-neutral-300 text-white font-semibold transition-colors"
-      >
-        {loading ? 'יוצר...' : 'צור והמשך לעורך'}
-      </button>
+      <div className="flex items-center gap-3 flex-wrap">
+        <button
+          type="submit"
+          disabled={loading || !title.trim()}
+          className="px-4 py-2.5 rounded-pill bg-brand-purple-700 hover:bg-brand-purple-600 disabled:bg-neutral-300 text-white font-semibold transition-colors"
+        >
+          {loading ? 'יוצר...' : 'צור והמשך לעורך'}
+        </button>
+        <span className="text-xs text-neutral-500">כל השדות — כולל הכותרת, הקישור והתוכן — ניתנים לעריכה בכל שלב בעורך.</span>
+      </div>
     </form>
   );
 }

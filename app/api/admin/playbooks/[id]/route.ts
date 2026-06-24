@@ -16,6 +16,10 @@ const UPDATABLE_FIELDS = [
   'tags',
   'status',
   'is_premium',
+  // Access model (migration 018)
+  'catalog_visibility',
+  'access_level',
+  'preview_enabled',
 ] as const;
 
 export async function PUT(request: Request, ctx: { params: Promise<{ id: string }> }) {

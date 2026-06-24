@@ -2,7 +2,9 @@ import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { ArrowRight } from 'lucide-react';
 import { getLesson } from '@/lib/learn/courses';
-import { renderMarkdownLite } from '@/lib/learn/markdown';
+import RichContentRenderer from '@/components/learn/RichContentRenderer';
+import ContentTableOfContents from '@/components/learn/ContentTableOfContents';
+import { toRichBlocks, extractToc } from '@/lib/learn/rich-content';
 import { getCurrentUser, hasPremiumAccess } from '@/lib/auth';
 import { getCompletedLessonIds, getCourseWithLessons } from '@/lib/learn/db';
 import VimeoPlayer from '@/components/learn/VimeoPlayer';
@@ -22,6 +24,8 @@ export default async function LessonPage({
   const data = await getLesson(courseSlug, lessonSlug);
   if (!data) notFound();
   const { course, lesson, prev, next, lessonId, isPremium } = data;
+  // Table of contents only for long written lessons (3+ H2 sections).
+  const lessonToc = lesson.body ? extractToc(toRichBlocks(lesson.body)) : [];
 
   if (isPremium) {
     const auth = await getCurrentUser();
@@ -84,7 +88,14 @@ export default async function LessonPage({
             </header>
 
             {lesson.body ? (
-              <div className="prose-learn" dangerouslySetInnerHTML={{ __html: renderMarkdownLite(lesson.body) }} />
+              <>
+                {lessonToc.length >= 3 && (
+                  <div className="mb-5">
+                    <ContentTableOfContents entries={lessonToc} variant="inline" title="בשיעור הזה" />
+                  </div>
+                )}
+                <RichContentRenderer content={lesson.body} />
+              </>
             ) : (
               <p className="text-neutral-400 italic">אין תוכן טקסטואלי לשיעור זה.</p>
             )}

@@ -39,7 +39,19 @@ export type Course = {
 // ============================================================
 
 export type ContentType = 'course' | 'guide';
-export type ContentStatus = 'draft' | 'published';
+export type ContentStatus = 'draft' | 'published' | 'archived';
+
+// ----- Public-first access model (migration 018) -----
+/** Controls listing/discovery only — never gates body access. */
+export type CatalogVisibility = 'public' | 'unlisted';
+/**
+ * Gates the full body (app + RLS enforced).
+ *   open                  — full content public; login only for high-intent actions.
+ *   login_required        — metadata public; body needs login; preview iff enabled.
+ *   purchase_required     — metadata public; body needs an active entitlement.
+ *   subscription_required — metadata public; body needs an active subscription.
+ */
+export type AccessLevel = 'open' | 'login_required' | 'purchase_required' | 'subscription_required';
 
 /** Guide content type — how the guide body is delivered. */
 export type GuideContentKind = 'youtube' | 'vimeo' | 'pdf' | 'link' | 'article';
@@ -126,6 +138,14 @@ export type ContentItem = {
   tags: string[];
   status: ContentStatus;
   is_premium: boolean;
+  // ----- Access model (migration 018) -----
+  catalog_visibility: CatalogVisibility;
+  access_level: AccessLevel;
+  /** Show a limited public preview when access_level gates the body. */
+  preview_enabled: boolean;
+  /** Price in price_currency for purchase_required items (null = not for sale). */
+  price_amount: number | null;
+  price_currency: string;
   body: GuideBlock[] | null;
   created_by: string | null;
   published_at: string | null;
@@ -209,6 +229,8 @@ export type Playlist = {
   thumbnail_url: string | null;
   domain: DomainId | null;
   status: ContentStatus;
+  /** Controls discovery only (migration 018). */
+  catalog_visibility: CatalogVisibility;
   is_featured: boolean;
   sort_order: number;
   seo_title: string | null;
@@ -270,6 +292,10 @@ export type Playbook = {
   tags: string[];
   status: ContentStatus;
   is_premium: boolean;
+  // ----- Access model (migration 018) -----
+  catalog_visibility: CatalogVisibility;
+  access_level: AccessLevel;
+  preview_enabled: boolean;
   published_at: string | null;
   created_by: string | null;
   created_at: string;

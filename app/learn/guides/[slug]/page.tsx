@@ -9,6 +9,8 @@ import {
 } from '@/lib/learn/db';
 import { getCurrentUser, getMyCreator, hasPremiumAccess } from '@/lib/auth';
 import GuideBlocks from '@/components/learn/GuideBlocks';
+import ContentTableOfContents from '@/components/learn/ContentTableOfContents';
+import { toRichBlocks, extractToc } from '@/lib/learn/rich-content';
 import VimeoPlayer from '@/components/learn/VimeoPlayer';
 import GuideCard from '@/components/learn/GuideCard';
 import SocialLinks from '@/components/learn/SocialLinks';
@@ -16,7 +18,8 @@ import { DOMAIN_BY_ID, domainBadgeClasses, domainDotClasses } from '@/lib/learn/
 import { youtubeIdFromUrl, youtubeEmbedUrl } from '@/lib/learn/youtube';
 import { parseVimeoInput } from '@/lib/learn/vimeo';
 import { contentKindLabel } from '@/lib/learn/placeholder';
-import { decideAccess, gateCtaLabel, type GateReason } from '@/lib/learn/access';
+import { decideAccess, gateCtaLabel, formatPrice, type GateReason } from '@/lib/learn/access';
+import AccessActionButton from '@/components/learn/AccessActionButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -71,8 +74,12 @@ export default async function GuideReadPage({ params }: { params: Promise<{ slug
   const ytId = youtubeIdFromUrl(guide.content_url) ?? youtubeIdFromUrl(guide.video_url);
   const vimeo = guide.content_url ? parseVimeoInput(guide.content_url) : null;
 
+  // "במדריך הזה" table of contents — shown when the body has 3+ H2 sections.
+  const toc = showFull ? extractToc(toRichBlocks(guide.body)) : [];
+  const hasToc = toc.length >= 3;
+
   return (
-    <article className="px-4 sm:px-6 lg:px-10 py-8 max-w-3xl mx-auto">
+    <article className={['px-4 sm:px-6 lg:px-10 py-8 mx-auto', hasToc ? 'max-w-5xl' : 'max-w-3xl'].join(' ')}>
       <Link href="/learn/guides" className="inline-flex items-center gap-1 text-sm text-neutral-500 hover:text-neutral-900 mb-6">
         <ArrowRight className="w-3.5 h-3.5" />
         חזרה למדריכים
@@ -85,6 +92,13 @@ export default async function GuideReadPage({ params }: { params: Promise<{ slug
         </div>
       )}
 
+      <div className={hasToc ? 'lg:grid lg:grid-cols-[1fr_14rem] lg:gap-10 lg:items-start' : ''}>
+        <div className="min-w-0">
+        {hasToc && (
+          <div className="lg:hidden mb-6">
+            <ContentTableOfContents entries={toc} variant="inline" />
+          </div>
+        )}
       <header className="mb-8">
         {/* Hero — player for video kinds, cover otherwise */}
         {kind === 'youtube' && ytId ? (
@@ -161,7 +175,11 @@ export default async function GuideReadPage({ params }: { params: Promise<{ slug
 
       {/* Gated guides show a public intro + access CTA instead of the body. */}
       {decision.state !== 'full' && (
-        <GuideGate reason={decision.reason} slug={slug} loggedIn={!!auth} />
+        <GuideGate
+          reason={decision.reason}
+          slug={slug}
+          priceLabel={formatPrice(guide.price_amount, guide.price_currency)}
+        />
       )}
 
       {/* Main content by kind */}
@@ -245,21 +263,25 @@ export default async function GuideReadPage({ params }: { params: Promise<{ slug
           </div>
         </div>
       )}
+        </div>
+        {hasToc && (
+          <aside className="hidden lg:block w-56 shrink-0">
+            <ContentTableOfContents entries={toc} variant="sidebar" />
+          </aside>
+        )}
+      </div>
     </article>
   );
 }
 
-/** Public intro gate shown for registered/premium guides the viewer can't fully open yet. */
-function GuideGate({ reason, slug, loggedIn }: { reason: GateReason; slug: string; loggedIn: boolean }) {
+/** Public intro gate shown for login/purchase/subscription-gated guides. */
+function GuideGate({ reason, slug, priceLabel }: { reason: GateReason; slug: string; priceLabel: string | null }) {
   const returnTo = `/learn/guides/${slug}`;
-  const href =
-    reason === 'login'
-      ? `/login?return=${encodeURIComponent(returnTo)}`
-      : reason === 'subscription'
-        ? loggedIn
-          ? `/upgrade?return=${encodeURIComponent(returnTo)}`
-          : `/login?return=${encodeURIComponent(returnTo)}`
-        : `/pricing`;
+  const kind = reason === 'login' ? 'login' : reason === 'subscription' ? 'subscribe' : 'purchase';
+  const label =
+    reason === 'purchase' && priceLabel ? `${gateCtaLabel(reason)} · ${priceLabel}` : gateCtaLabel(reason);
+  const btnCls =
+    'inline-flex items-center gap-2 px-5 py-2.5 rounded-pill bg-brand-purple-700 hover:bg-brand-purple-600 text-white text-sm font-bold transition-colors disabled:opacity-70';
   return (
     <div
       className="rounded-2xl border border-neutral-200 bg-white p-8 text-center"
@@ -272,12 +294,14 @@ function GuideGate({ reason, slug, loggedIn }: { reason: GateReason; slug: strin
       <p className="text-sm text-neutral-500 max-w-sm mx-auto mb-6">
         שמרו את ההתקדמות שלכם וקבלו גישה מלאה לתוכן הזה ולעוד.
       </p>
-      <Link
-        href={href}
-        className="inline-flex items-center gap-2 px-5 py-2.5 rounded-pill bg-brand-purple-700 hover:bg-brand-purple-600 text-white text-sm font-bold transition-colors"
-      >
-        {gateCtaLabel(reason)}
-      </Link>
+      <AccessActionButton
+        kind={kind}
+        slug={slug}
+        contentType="guide"
+        returnTo={returnTo}
+        label={label}
+        className={btnCls}
+      />
     </div>
   );
 }

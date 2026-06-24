@@ -88,6 +88,13 @@ export function decideAccess(
   }
 }
 
+/** "₪149" / "$49" / "€20" — null when there is no positive price. */
+export function formatPrice(amount: number | null | undefined, currency: string | null | undefined): string | null {
+  if (!amount || amount <= 0) return null;
+  const sym = currency === 'USD' ? '$' : currency === 'EUR' ? '€' : '₪';
+  return `${sym}${amount % 1 === 0 ? amount : amount.toFixed(2)}`;
+}
+
 /** Hebrew CTA label for a gate reason. */
 export function gateCtaLabel(reason: GateReason): string {
   switch (reason) {

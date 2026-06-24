@@ -5,8 +5,9 @@ import { useRouter } from 'next/navigation';
 import { Trash2, ArrowUp, ArrowDown, Plus, X } from 'lucide-react';
 import FileUpload from './FileUpload';
 import SaveIndicator, { type SaveState } from './SaveIndicator';
+import AccessControlFields from './AccessControlFields';
 import { DOMAINS, type DomainId, isDomainId } from '@/lib/learn/domains';
-import type { Playlist, ContentItem } from '@/lib/learn/types';
+import type { Playlist, ContentItem, CatalogVisibility } from '@/lib/learn/types';
 
 type GuideOption = { id: string; title: string };
 
@@ -27,6 +28,7 @@ export default function PlaylistEditor({
   const [thumbnail, setThumbnail] = useState(initial.thumbnail_url ?? '');
   const [domain, setDomain] = useState<DomainId | null>(initial.domain ?? null);
   const [status, setStatus] = useState(initial.status);
+  const [catalogVisibility, setCatalogVisibility] = useState<CatalogVisibility>(initial.catalog_visibility ?? 'public');
   const [orderedIds, setOrderedIds] = useState<string[]>(items.map((i) => i.id));
   const [saveState, setSaveState] = useState<SaveState>('idle');
   const dirty = useRef(false);
@@ -42,9 +44,10 @@ export default function PlaylistEditor({
     description: description || null,
     thumbnail_url: thumbnail || null,
     domain,
+    catalog_visibility: catalogVisibility,
     content_item_ids: orderedIds,
     ...extra,
-  }), [title, description, thumbnail, domain, orderedIds]);
+  }), [title, description, thumbnail, domain, catalogVisibility, orderedIds]);
 
   const persist = useCallback(async (payload: Record<string, unknown>) => {
     setSaveState('saving');
@@ -70,7 +73,7 @@ export default function PlaylistEditor({
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => { persist(buildPayload()); }, 1000);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [title, description, thumbnail, domain, orderedIds]);
+  }, [title, description, thumbnail, domain, catalogVisibility, orderedIds]);
 
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
 
@@ -150,6 +153,11 @@ export default function PlaylistEditor({
           </div>
         </div>
       </section>
+
+      <AccessControlFields
+        catalogVisibility={catalogVisibility}
+        onCatalogVisibility={setCatalogVisibility}
+      />
 
       <section className="bg-white rounded-2xl border border-neutral-200 p-5">
         <h2 className="text-sm font-extrabold text-neutral-700 uppercase tracking-wide mb-3">מדריכים בפלייליסט</h2>
