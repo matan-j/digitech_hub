@@ -97,6 +97,7 @@ export async function GET(_request: Request, ctx: { params: Promise<{ id: string
       provider_transaction_id: order.provider_transaction_id,
       document_id: order.document_id,
       has_invoice: Boolean(order.document_url || order.document_id),
+      checkout_url: order.checkout_url,
     },
     customer: {
       name: (profile?.full_name as string | null) ?? null,

@@ -29,6 +29,8 @@ export type PurchaseRow = {
   currency: string;
   /** True when a downloadable receipt/invoice exists for this order. */
   has_invoice: boolean;
+  /** GROW payment link — present while the order is still unpaid, for resuming payment. */
+  checkout_url: string | null;
 };
 
 export type AdminPurchaseRow = PurchaseRow & {
@@ -37,7 +39,7 @@ export type AdminPurchaseRow = PurchaseRow & {
   user_name: string | null;
 };
 
-const COLS_BASE = 'public_order_id, created_at, content_type, content_id, status, amount, currency, user_id';
+const COLS_BASE = 'public_order_id, created_at, content_type, content_id, status, amount, currency, checkout_url, user_id';
 const COLS_FULL = `${COLS_BASE}, document_id, document_url`;
 
 type RawOrder = {
@@ -48,6 +50,7 @@ type RawOrder = {
   status: OrderStatus;
   amount: number;
   currency: string;
+  checkout_url: string | null;
   user_id: string;
   document_id?: string | null;
   document_url?: string | null;
@@ -93,6 +96,7 @@ function toRow(o: RawOrder, titles: Map<string, string>): PurchaseRow {
     amount: Number(o.amount),
     currency: o.currency,
     has_invoice: Boolean(o.document_url || o.document_id),
+    checkout_url: o.checkout_url ?? null,
   };
 }
 

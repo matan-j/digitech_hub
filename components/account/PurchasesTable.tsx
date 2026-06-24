@@ -1,18 +1,21 @@
 'use client';
 
 import { useEffect, useState, type ReactNode } from 'react';
-import { Download, Receipt, X, Loader2 } from 'lucide-react';
+import { Download, Receipt, X, Loader2, CreditCard } from 'lucide-react';
 
 // Row shape shared with lib/payments/purchase-history.ts (kept local to avoid a
 // server-only import leaking into this client component).
 export type PurchaseRow = {
   public_order_id: string;
   created_at: string;
+  content_id: string;
   product_title: string;
   status: 'pending' | 'paid' | 'failed' | 'cancelled' | 'refunded';
   amount: number;
   currency: string;
   has_invoice: boolean;
+  /** GROW payment link while the order is unpaid — for resuming payment. */
+  checkout_url?: string | null;
   // Present only in the admin (all-users) view.
   user_email?: string | null;
   user_name?: string | null;
@@ -84,7 +87,7 @@ export default function PurchasesTable({
               <th className={`text-right ${cell} font-semibold`}>מוצר</th>
               <th className={`text-right ${cell} font-semibold`}>סטטוס</th>
               <th className={`text-right ${cell} font-semibold`}>סכום</th>
-              <th className={`text-right ${cell} font-semibold`}>חשבונית</th>
+              <th className={`text-right ${cell} font-semibold`}>חשבונית / תשלום</th>
             </tr>
           </thead>
           <tbody>
@@ -102,7 +105,10 @@ export default function PurchasesTable({
                   </td>
                 )}
                 <td className={`${cell} text-neutral-600 whitespace-nowrap`}>{formatDateTime(r.created_at)}</td>
-                <td className={`${cell} text-neutral-900`}>{r.product_title}</td>
+                <td className={`${cell} text-neutral-900`}>
+                  <div>{r.product_title}</div>
+                  <div className="font-mono text-[11px] text-neutral-500" dir="ltr">{r.content_id}</div>
+                </td>
                 <td className={cell}>
                   <span className={`inline-block px-2 py-0.5 rounded-pill text-[11px] font-semibold ${STATUS_CLS[r.status]}`}>
                     {STATUS_LABEL[r.status]}
@@ -110,7 +116,19 @@ export default function PurchasesTable({
                 </td>
                 <td className={`${cell} font-semibold text-neutral-900 whitespace-nowrap`}>{formatAmount(r.amount, r.currency)}</td>
                 <td className={cell}>
-                  {r.has_invoice ? (
+                  {r.status !== 'paid' && r.checkout_url ? (
+                    <a
+                      href={r.checkout_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="inline-flex items-center gap-1 text-brand-purple-700 hover:text-brand-purple-600 font-semibold text-xs"
+                      aria-label="המשך לתשלום"
+                      title="המשך לתשלום"
+                    >
+                      <CreditCard className="w-4 h-4" />
+                    </a>
+                  ) : r.has_invoice ? (
                     <a
                       href={`/api/account/orders/${encodeURIComponent(r.public_order_id)}/invoice`}
                       target="_blank"
@@ -154,6 +172,7 @@ type OrderDetail = {
     provider_transaction_id: string | null;
     document_id: string | null;
     has_invoice: boolean;
+    checkout_url: string | null;
   };
   customer: { name: string | null; email: string | null; phone: string | null };
   payment: {
@@ -263,6 +282,16 @@ export function PurchaseDetailModal({ publicOrderId, onClose }: { publicOrderId:
               <Row label="נוצר" value={formatDateTime(o.created_at)} />
               <Row label="עודכן" value={formatDateTime(o.updated_at)} />
               <Row label="ספק תשלום" value={o.provider} mono />
+              {o.status !== 'paid' && o.checkout_url && (
+                <Row
+                  label="לינק תשלום"
+                  value={
+                    <a href={o.checkout_url} target="_blank" rel="noopener noreferrer" className="text-brand-purple-700 hover:text-brand-purple-600 underline font-semibold">
+                      פתח לינק תשלום
+                    </a>
+                  }
+                />
+              )}
             </Section>
 
             <Section title="סכומים">
@@ -298,6 +327,18 @@ export function PurchaseDetailModal({ publicOrderId, onClose }: { publicOrderId:
                   <Row key={k} label={FIELD_LABELS[k] ?? k} value={v} mono={!FIELD_LABELS[k]} />
                 ))}
               </Section>
+            )}
+
+            {o.status !== 'paid' && o.checkout_url && (
+              <a
+                href={o.checkout_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 w-full px-4 py-2 rounded-pill bg-brand-purple-700 hover:bg-brand-purple-600 text-white text-sm font-semibold transition-colors"
+              >
+                <CreditCard className="w-4 h-4" />
+                המשך לתשלום
+              </a>
             )}
 
             {o.has_invoice && (
