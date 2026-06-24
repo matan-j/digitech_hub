@@ -5,6 +5,9 @@ import { createClient } from '@/lib/supabase/client';
 import { Loader2 } from 'lucide-react';
 import { GoogleGIcon } from '@/components/icons/google';
 import OtpInput from '@/components/auth/OtpInput';
+import { NameField } from '@/components/auth/ContactFields';
+import { validateHebrewFullName, normalizeFullName } from '@/lib/validation/profile';
+import { lookupEmailProviders } from '@/lib/auth-providers';
 
 type Mode = 'sign-in' | 'sign-up' | 'reset';
 
@@ -14,6 +17,10 @@ export default function LoginForm({ returnTo }: { returnTo?: string }) {
   const [mode, setMode] = useState<Mode>('sign-in');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [nameError, setNameError] = useState<string | null>(null);
+  const [terms, setTerms] = useState(false);
+  const [marketing, setMarketing] = useState(false);
   const [loading, setLoading] = useState<null | 'google' | 'email'>(null);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
@@ -43,6 +50,27 @@ export default function LoginForm({ returnTo }: { returnTo?: string }) {
     setLoading(null);
   }
 
+  // Persist the sign-up consent (name + terms + marketing) once a session
+  // exists — same profile fields the access-modal popup records. Best-effort;
+  // only runs when the user actually accepted the terms (i.e. the sign-up path).
+  async function recordConsent() {
+    if (!terms) return;
+    try {
+      await fetch('/api/leads/capture', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          full_name: normalizeFullName(fullName),
+          marketing_consent: marketing,
+          terms_accepted: true,
+          intended_action: 'signup',
+        }),
+      });
+    } catch {
+      /* best-effort — never block the redirect */
+    }
+  }
+
   async function verifyCode(code: string) {
     if (!verifyEmail || loading === 'email') return;
     setError(null);
@@ -60,7 +88,8 @@ export default function LoginForm({ returnTo }: { returnTo?: string }) {
       setError(translateError(error.message));
       return;
     }
-    // verifyOtp set the session cookie — go straight in.
+    // verifyOtp set the session cookie — record consent, then go straight in.
+    await recordConsent();
     window.location.href = safeReturnTo;
   }
 
@@ -117,6 +146,16 @@ export default function LoginForm({ returnTo }: { returnTo?: string }) {
             enterVerifyStep(email, 'המייל שלך עוד לא אומת. שלחנו לך קוד אימות בן 6 ספרות.');
             return;
           }
+          // Wrong password may actually mean "this email has no password — it's a
+          // Google account". Steer there instead of the misleading credentials error.
+          if (error.message.toLowerCase().includes('invalid login credentials')) {
+            const existing = await lookupEmailProviders(email);
+            if (existing.hasGoogle && !existing.hasPassword) {
+              setLoading(null);
+              setError('המייל הזה מחובר דרך Google. השתמש בכפתור "התחברות עם Google" למעלה.');
+              return;
+            }
+          }
           throw error;
         }
         window.location.href = safeReturnTo;
@@ -124,13 +163,44 @@ export default function LoginForm({ returnTo }: { returnTo?: string }) {
       }
 
       if (mode === 'sign-up') {
+        const nameCheck = validateHebrewFullName(fullName);
+        if (!nameCheck.valid) {
+          setNameError(nameCheck.error ?? null);
+          setLoading(null);
+          return;
+        }
+        if (!terms) {
+          setLoading(null);
+          throw new Error('יש לאשר את תנאי השימוש ומדיניות הפרטיות');
+        }
         if (password.length < 8) {
           throw new Error('הסיסמה חייבת להיות באורך 8 תווים לפחות');
         }
-        const { data, error } = await supabase.auth.signUp({ email, password });
+        // Cross-provider guard: never mint a second account for an email that
+        // already exists under another method — steer the user to it instead.
+        const existing = await lookupEmailProviders(email);
+        if (existing.hasGoogle && !existing.hasPassword) {
+          setLoading(null);
+          setError('המייל הזה כבר רשום דרך Google. התחבר עם הכפתור "התחברות עם Google" למעלה.');
+          return;
+        }
+        if (existing.hasPassword) {
+          setLoading(null);
+          setMode('sign-in');
+          setInfo('כבר קיים חשבון עם המייל הזה. אפשר להתחבר עם הסיסמה, או לאפס סיסמה אם שכחת.');
+          return;
+        }
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: { full_name: normalizeFullName(fullName), marketing_consent: marketing },
+          },
+        });
         if (error) throw error;
         // If email confirmation is OFF, signUp returns a session — jump straight in.
         if (data.session) {
+          await recordConsent();
           window.location.href = safeReturnTo;
           return;
         }
@@ -247,7 +317,22 @@ export default function LoginForm({ returnTo }: { returnTo?: string }) {
       </div>
 
       {/* Email / password */}
-      <form onSubmit={handleEmail} className="space-y-3">
+      <form onSubmit={handleEmail} className="space-y-3" noValidate>
+        {mode === 'sign-up' && (
+          <NameField
+            id="signup-name"
+            value={fullName}
+            error={nameError}
+            onChange={(v) => {
+              setFullName(v);
+              if (nameError) setNameError(null);
+            }}
+            onBlur={() => {
+              const r = validateHebrewFullName(fullName);
+              setNameError(r.valid ? null : r.error ?? null);
+            }}
+          />
+        )}
         <div className="space-y-1">
           <label htmlFor="email" className="block text-sm font-semibold text-neutral-800">
             כתובת מייל
@@ -283,6 +368,38 @@ export default function LoginForm({ returnTo }: { returnTo?: string }) {
               className="w-full px-3 py-2.5 rounded-md border border-neutral-300 focus:border-brand-purple-500 focus:outline-none focus:ring-2 focus:ring-brand-purple-200 text-neutral-900 text-base"
             />
           </div>
+        )}
+
+        {mode === 'sign-up' && (
+          <>
+            <label className="flex items-start gap-2.5 text-sm text-neutral-700 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={terms}
+                onChange={(e) => setTerms(e.target.checked)}
+                className="mt-0.5 w-4 h-4 accent-brand-purple-700"
+              />
+              <span>
+                אני מאשר/ת את{' '}
+                <a href="/terms" target="_blank" className="text-brand-purple-700 font-semibold underline">
+                  תנאי השימוש
+                </a>{' '}
+                ו
+                <a href="/privacy" target="_blank" className="text-brand-purple-700 font-semibold underline">
+                  מדיניות הפרטיות
+                </a>
+              </span>
+            </label>
+            <label className="flex items-start gap-2.5 text-sm text-neutral-600 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={marketing}
+                onChange={(e) => setMarketing(e.target.checked)}
+                className="mt-0.5 w-4 h-4 accent-brand-purple-700"
+              />
+              <span>אשמח לקבל עדכונים ותכנים שיווקיים במייל (לא חובה)</span>
+            </label>
+          </>
         )}
 
         {error && <p className="text-sm text-red-600">{error}</p>}

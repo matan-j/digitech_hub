@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { requireUser } from '@/lib/auth';
 import SubscriptionCard from '@/components/account/SubscriptionCard';
+import ContactInfoCard from '@/components/account/ContactInfoCard';
 import LogoutButton from '@/components/auth/LogoutButton';
 
 export const metadata = {
@@ -33,12 +34,6 @@ export default async function AccountPage() {
                 <dt className="text-neutral-500">מייל</dt>
                 <dd className="font-medium text-neutral-900" dir="ltr">{email}</dd>
               </div>
-              {profile.full_name && (
-                <div className="flex items-center justify-between">
-                  <dt className="text-neutral-500">שם</dt>
-                  <dd className="font-medium text-neutral-900">{profile.full_name}</dd>
-                </div>
-              )}
               <div className="flex items-center justify-between">
                 <dt className="text-neutral-500">תפקיד</dt>
                 <dd className="font-medium text-neutral-900">
@@ -47,6 +42,8 @@ export default async function AccountPage() {
               </div>
             </dl>
           </div>
+
+          <ContactInfoCard initialName={profile.full_name} initialPhone={profile.phone} />
 
           <SubscriptionCard profile={profile} />
         </div>

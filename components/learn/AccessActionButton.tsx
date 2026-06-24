@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { useAccessGate } from '@/components/auth/AccessModalProvider';
+import { useContactInfo } from '@/components/auth/ContactInfoProvider';
 import type { ContentType } from '@/lib/payments/order-service';
 
 /**
@@ -47,13 +48,10 @@ export default function AccessActionButton({
   icon?: React.ReactNode;
 }) {
   const { requireAccess } = useAccessGate();
+  const { requireContactInfo } = useContactInfo();
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  // Shown when a logged-in buyer has no phone on file — collected before the
-  // purchase webhook can be sent.
-  const [phoneNeeded, setPhoneNeeded] = useState(false);
-  const [phone, setPhone] = useState('');
 
   // Already-accessible content → a plain link, no gate, no JS round-trip.
   if (kind === 'continue' && targetHref) {
@@ -88,14 +86,22 @@ export default function AccessActionButton({
     }
   }
 
-  async function startPurchase(phoneArg?: string) {
+  // Ensure a valid name + phone are on file (popup if not), then purchase. The
+  // /api/purchase route reads name + phone from the saved profile.
+  async function runPurchase() {
+    const info = await requireContactInfo();
+    if (!info) return; // user dismissed the popup — abort silently
+    await startPurchase();
+  }
+
+  async function startPurchase() {
     setBusy(true);
     setErr(null);
     try {
       const res = await fetch('/api/purchase', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contentType: contentType ?? 'course', slug, phone: phoneArg }),
+        body: JSON.stringify({ contentType: contentType ?? 'course', slug }),
       });
       const d = await res.json().catch(() => ({}));
       if (res.ok && typeof d?.redirect === 'string') {
@@ -104,8 +110,11 @@ export default function AccessActionButton({
         return;
       }
       if (res.status === 400 && d?.error === 'phone_required') {
-        setPhoneNeeded(true);
+        // Should be covered by the gate above; re-prompt as a safety net.
         setBusy(false);
+        const info = await requireContactInfo();
+        if (info) { await startPurchase(); return; }
+        setErr('צריך מספר טלפון כדי להשלים את בקשת הרכישה.');
         return;
       }
       if (res.status === 502 && d?.error === 'webhook_failed') {
@@ -121,13 +130,6 @@ export default function AccessActionButton({
     }
   }
 
-  function submitPhone() {
-    const trimmed = phone.trim();
-    if (!trimmed) { setErr('נא להזין מספר טלפון.'); return; }
-    setPhoneNeeded(false);
-    void startPurchase(trimmed);
-  }
-
   function onClick() {
     const action =
       kind === 'enroll'
@@ -141,7 +143,7 @@ export default function AccessActionButton({
       kind === 'enroll'
         ? enrollThenGo
         : kind === 'purchase'
-          ? () => startPurchase()
+          ? runPurchase
           : kind === 'subscribe'
             ? () => window.location.assign(`/upgrade?return=${encodeURIComponent(returnTo)}`)
             : () => router.refresh(); // 'login' — authed path reveals the body
@@ -154,29 +156,6 @@ export default function AccessActionButton({
         {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : icon}
         {label}
       </button>
-      {phoneNeeded && (
-        <span className="mt-2 flex items-center gap-2">
-          <input
-            type="tel"
-            inputMode="tel"
-            dir="ltr"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); submitPhone(); } }}
-            placeholder="מספר טלפון"
-            className="px-3 py-2 rounded-pill border border-neutral-300 text-sm text-neutral-900 bg-white focus:outline-none focus:border-brand-purple-400 w-44"
-          />
-          <button
-            type="button"
-            onClick={submitPhone}
-            disabled={busy}
-            className="px-4 py-2 rounded-pill bg-brand-purple-700 hover:bg-brand-purple-600 text-white text-sm font-semibold disabled:opacity-70"
-          >
-            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : 'המשך'}
-          </button>
-        </span>
-      )}
-      {phoneNeeded && <span className="mt-1 text-[11px] text-brand-purple-100">צריך מספר טלפון כדי להשלים את בקשת הרכישה.</span>}
       {err && <span className={errorClassName}>{err}</span>}
     </span>
   );

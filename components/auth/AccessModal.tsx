@@ -4,11 +4,14 @@ import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { Loader2, X } from 'lucide-react';
 import { GoogleGIcon } from '@/components/icons/google';
+import OtpInput from '@/components/auth/OtpInput';
+import { useContactForm, NameField, PhoneField } from '@/components/auth/ContactFields';
 import {
   captureAttribution,
   stashPendingLead,
   type PendingLead,
 } from '@/lib/learn/attribution';
+import { lookupEmailProviders } from '@/lib/auth-providers';
 
 export type AccessRequest = {
   /** Machine label of the gated action, e.g. 'watch_full_guide'. */
@@ -25,24 +28,33 @@ type Props = {
   onClose: () => void;
 };
 
+const RESEND_COOLDOWN = 30; // seconds between code resends
+
 /**
  * Branded fast-access modal. Two auth paths, no password:
  *   - Google Sign-In (primary)
- *   - Magic Link (name + email + phone + terms; optional marketing consent)
+ *   - Email code (name + email + phone + terms; optional marketing consent):
+ *     we send a 6-digit code and verify it inline — the SAME method as the
+ *     /login registration form (OtpInput + verifyOtp), not a magic-link email.
  *
- * On either path the entered profile data + captured attribution are stashed
- * in localStorage so they survive the auth redirect and can be written to the
- * profile once a session appears (handled by AccessModalProvider).
+ * The entered profile data + captured attribution are stashed in localStorage
+ * so they survive and can be written to the profile once a session appears
+ * (handled by AccessModalProvider after we navigate to returnTo).
  */
 export default function AccessModal({ open, request, onClose }: Props) {
-  const [fullName, setFullName] = useState('');
+  const form = useContactForm();
   const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
   const [terms, setTerms] = useState(false);
   const [marketing, setMarketing] = useState(false);
   const [loading, setLoading] = useState<null | 'google' | 'email'>(null);
   const [error, setError] = useState<string | null>(null);
-  const [sent, setSent] = useState(false);
+
+  // Code-verification step (mirrors LoginForm): set once a code has been sent.
+  const [verifyEmail, setVerifyEmail] = useState<string | null>(null);
+  const [otp, setOtp] = useState('');
+  const [otpKey, setOtpKey] = useState(0); // bump to clear the OTP boxes
+  const [resendIn, setResendIn] = useState(0);
+  const [info, setInfo] = useState<string | null>(null);
 
   // Reset transient state each time the modal opens.
   /* eslint-disable react-hooks/set-state-in-effect */
@@ -50,7 +62,10 @@ export default function AccessModal({ open, request, onClose }: Props) {
     if (open) {
       setError(null);
       setLoading(null);
-      setSent(false);
+      setVerifyEmail(null);
+      setOtp('');
+      setInfo(null);
+      setResendIn(0);
     }
   }, [open]);
   /* eslint-enable react-hooks/set-state-in-effect */
@@ -64,14 +79,21 @@ export default function AccessModal({ open, request, onClose }: Props) {
     return () => window.removeEventListener('keydown', onKey);
   }, [open, onClose]);
 
+  // Resend cooldown ticker.
+  useEffect(() => {
+    if (resendIn <= 0) return;
+    const t = setInterval(() => setResendIn((s) => s - 1), 1000);
+    return () => clearInterval(t);
+  }, [resendIn]);
+
   if (!open || !request) return null;
 
   const buildPending = (): PendingLead => {
     const attr = captureAttribution();
     const pending: PendingLead = {
       ...attr,
-      full_name: fullName.trim() || undefined,
-      phone: phone.trim() || undefined,
+      full_name: form.name.trim() || undefined,
+      phone: form.phone.trim() || undefined,
       marketing_consent: marketing,
       intended_action: request.action,
       return_to: request.returnTo,
@@ -117,29 +139,37 @@ export default function AccessModal({ open, request, onClose }: Props) {
     // On success the browser navigates to Google.
   }
 
-  async function continueWithMagicLink(e: React.FormEvent) {
+  /** Send the 6-digit email code, then move to the inline verification step. */
+  async function sendCode(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
 
-    if (!fullName.trim()) return setError('יש להזין שם מלא');
+    // Name + phone are validated inline (red text under the field); email +
+    // terms keep the single shared error line.
+    const valid = form.validateAll();
+    if (!valid) return;
     if (!email.trim()) return setError('יש להזין כתובת מייל');
-    if (!phone.trim()) return setError('יש להזין מספר טלפון');
     if (!terms) return setError('יש לאשר את תנאי השימוש ומדיניות הפרטיות');
 
     setLoading('email');
-    // Stash everything (incl. terms acceptance via marketing/consent context)
-    // so we can write it once the session exists after the redirect.
-    const pending = buildPending();
-    stashPendingLead(pending);
+
+    // Cross-provider guard: if this email already belongs to a Google account,
+    // sending a code would bypass it — steer the user back to Google instead.
+    const existing = await lookupEmailProviders(email.trim());
+    if (existing.hasGoogle && !existing.hasPassword) {
+      setLoading(null);
+      setError('המייל הזה כבר רשום דרך Google. השתמש בכפתור "המשך עם Google" למעלה.');
+      return;
+    }
+
+    // Stash everything now so it can be written to the profile once the session
+    // exists (after we navigate to returnTo post-verification).
+    stashPendingLead(buildPending());
 
     const supabase = createClient();
     const { error } = await supabase.auth.signInWithOtp({
       email: email.trim(),
-      options: {
-        emailRedirectTo: callbackUrl(),
-        shouldCreateUser: true,
-        data: { full_name: fullName.trim() },
-      },
+      options: { shouldCreateUser: true, data: { full_name: valid.name } },
     });
     if (error) {
       setLoading(null);
@@ -147,7 +177,54 @@ export default function AccessModal({ open, request, onClose }: Props) {
       return;
     }
     setLoading(null);
-    setSent(true);
+    setVerifyEmail(email.trim());
+    setOtp('');
+    setOtpKey((k) => k + 1);
+    setResendIn(RESEND_COOLDOWN);
+    setInfo('שלחנו לך קוד אימות בן 6 ספרות למייל.');
+  }
+
+  async function verifyCode(code: string) {
+    if (!verifyEmail || loading === 'email') return;
+    setError(null);
+    setLoading('email');
+    const supabase = createClient();
+    const { error } = await supabase.auth.verifyOtp({
+      email: verifyEmail,
+      token: code,
+      type: 'email',
+    });
+    if (error) {
+      setLoading(null);
+      setOtp('');
+      setOtpKey((k) => k + 1); // clear boxes for another attempt
+      setError(translateError(error.message));
+      return;
+    }
+    // Session is set — go to where the user intended. AccessModalProvider on the
+    // destination flushes the stashed name/phone/consent to the profile.
+    window.location.assign(request!.returnTo);
+  }
+
+  async function resendCode() {
+    if (!verifyEmail || resendIn > 0) return;
+    setError(null);
+    setInfo(null);
+    setLoading('email');
+    const supabase = createClient();
+    const { error } = await supabase.auth.signInWithOtp({
+      email: verifyEmail,
+      options: { shouldCreateUser: true, data: { full_name: form.name.trim() } },
+    });
+    setLoading(null);
+    if (error) {
+      setError(translateError(error.message));
+    } else {
+      setInfo('שלחנו לך קוד חדש.');
+      setResendIn(RESEND_COOLDOWN);
+      setOtp('');
+      setOtpKey((k) => k + 1);
+    }
   }
 
   return (
@@ -179,24 +256,72 @@ export default function AccessModal({ open, request, onClose }: Props) {
           <X className="w-4 h-4" />
         </button>
 
-        {sent ? (
-          <div className="text-center py-4">
-            <div
-              className="w-14 h-14 mx-auto mb-4 rounded-pill flex items-center justify-center text-2xl"
-              style={{ backgroundColor: 'var(--color-brand-purple-50)' }}
-            >
-              ✉️
+        {verifyEmail ? (
+          /* ===== Code-verification step (same method as /login) ===== */
+          <div className="space-y-5">
+            <div className="space-y-1.5 text-center">
+              <h2 className="text-xl font-extrabold text-neutral-950">הזן את קוד האימות</h2>
+              <p className="text-sm text-neutral-700">
+                שלחנו קוד בן 6 ספרות אל
+                <br />
+                <span className="font-semibold text-neutral-900" dir="ltr">
+                  {verifyEmail}
+                </span>
+              </p>
             </div>
-            <h2 className="text-xl font-extrabold text-neutral-950 mb-2">
-              בדוק את המייל שלך
-            </h2>
-            <p className="text-sm text-neutral-700 leading-relaxed">
-              שלחנו קישור התחברות ל-
-              <span dir="ltr" className="font-semibold">
-                {email}
-              </span>
-              . לחץ עליו כדי להמשיך — תחזור בדיוק לאן שהיית.
-            </p>
+
+            <OtpInput
+              key={otpKey}
+              autoFocus
+              disabled={loading === 'email'}
+              onChange={setOtp}
+              onComplete={verifyCode}
+            />
+
+            {error && <p className="text-sm text-red-600 text-center">{error}</p>}
+            {info && !error && (
+              <p className="text-sm text-brand-purple-900 bg-brand-purple-50 border border-brand-purple-200 rounded-md px-3 py-2 text-center">
+                {info}
+              </p>
+            )}
+
+            <button
+              type="button"
+              onClick={() => verifyCode(otp)}
+              disabled={loading === 'email' || otp.length < 6}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-pill bg-brand-purple-700 hover:bg-brand-purple-800 disabled:bg-neutral-300 text-white font-semibold transition-colors"
+            >
+              {loading === 'email' && <Loader2 className="w-4 h-4 animate-spin" />}
+              אמת והמשך
+            </button>
+
+            <div className="text-center text-xs text-neutral-500 space-y-1.5">
+              <div>
+                לא קיבלת קוד?{' '}
+                <button
+                  type="button"
+                  onClick={resendCode}
+                  disabled={resendIn > 0 || loading === 'email'}
+                  className="font-semibold text-brand-purple-700 hover:text-brand-purple-600 disabled:text-neutral-400"
+                >
+                  {resendIn > 0 ? `שלח שוב בעוד ${resendIn}` : 'שלח קוד חדש'}
+                </button>
+              </div>
+              <div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setVerifyEmail(null);
+                    setError(null);
+                    setInfo(null);
+                    setOtp('');
+                  }}
+                  className="text-neutral-500 hover:text-brand-purple-700"
+                >
+                  ← חזרה
+                </button>
+              </div>
+            </div>
           </div>
         ) : (
           <>
@@ -225,19 +350,18 @@ export default function AccessModal({ open, request, onClose }: Props) {
 
             <div className="flex items-center gap-3 text-xs text-neutral-400 my-4">
               <div className="flex-1 h-px bg-neutral-200" />
-              <span>או עם קישור למייל</span>
+              <span>או עם קוד למייל</span>
               <div className="flex-1 h-px bg-neutral-200" />
             </div>
 
-            {/* Magic link form */}
-            <form onSubmit={continueWithMagicLink} className="space-y-3">
-              <Field
+            {/* Email-code form */}
+            <form onSubmit={sendCode} className="space-y-3" noValidate>
+              <NameField
                 id="am-name"
-                label="שם מלא"
-                value={fullName}
-                onChange={setFullName}
-                placeholder="ישראל ישראלי"
-                autoComplete="name"
+                value={form.name}
+                error={form.nameError}
+                onChange={form.onNameChange}
+                onBlur={form.blurName}
               />
               <Field
                 id="am-email"
@@ -249,15 +373,13 @@ export default function AccessModal({ open, request, onClose }: Props) {
                 placeholder="you@example.com"
                 autoComplete="email"
               />
-              <Field
+              <PhoneField
                 id="am-phone"
                 label="טלפון"
-                type="tel"
-                dir="ltr"
-                value={phone}
-                onChange={setPhone}
-                placeholder="050-0000000"
-                autoComplete="tel"
+                value={form.phone}
+                error={form.phoneError}
+                onChange={form.onPhoneChange}
+                onBlur={form.blurPhone}
               />
 
               <label className="flex items-start gap-2.5 text-sm text-neutral-700 cursor-pointer">
@@ -307,7 +429,7 @@ export default function AccessModal({ open, request, onClose }: Props) {
                 {loading === 'email' && (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 )}
-                שלח לי קישור כניסה
+                שלח לי קוד אימות
               </button>
             </form>
           </>
@@ -358,11 +480,14 @@ function Field({
 function translateError(msg: string): string {
   const m = msg.toLowerCase();
   if (m.includes('provider is not enabled') || m.includes('google')) {
-    return 'התחברות דרך Google עוד לא הופעלה. השתמש בקישור למייל.';
+    return 'התחברות דרך Google עוד לא הופעלה. השתמש בקוד למייל.';
   }
   if (m.includes('rate limit') || m.includes('too many')) {
     return 'נשלחו יותר מדי בקשות. נסה שוב בעוד דקה.';
   }
+  if (m.includes('token has expired') || m.includes('expired')) return 'הקוד פג תוקף. בקש קוד חדש.';
+  if (m.includes('invalid') && m.includes('token')) return 'הקוד שגוי. בדוק ונסה שוב.';
+  if (m.includes('otp') || m.includes('invalid token')) return 'הקוד שגוי או פג תוקף. נסה שוב או בקש קוד חדש.';
   if (m.includes('invalid') && m.includes('email')) return 'כתובת מייל לא תקינה';
   return msg;
 }

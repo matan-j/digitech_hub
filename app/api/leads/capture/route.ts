@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
+import {
+  validateHebrewFullName,
+  validateIsraeliPhone,
+  normalizeFullName,
+} from '@/lib/validation/profile';
 
 /**
  * POST /api/leads/capture
@@ -55,11 +60,18 @@ export async function POST(request: Request) {
 
   const patch: Record<string, unknown> = {};
 
-  // Always-overwritable profile fields (latest entered value wins).
+  // Always-overwritable profile fields (latest entered value wins). Invalid
+  // values are silently skipped — lead capture is best-effort and the
+  // completion popup will still prompt for anything missing.
   const fullName = str(body.full_name);
-  if (fullName) patch.full_name = fullName;
+  if (fullName && validateHebrewFullName(fullName).valid) {
+    patch.full_name = normalizeFullName(fullName);
+  }
   const phone = str(body.phone);
-  if (phone) patch.phone = phone;
+  if (phone) {
+    const r = validateIsraeliPhone(phone);
+    if (r.valid) patch.phone = r.value;
+  }
   const provider = str(body.auth_provider);
   if (provider) patch.auth_provider = provider;
   if (typeof body.marketing_consent === 'boolean') {
