@@ -1,43 +1,32 @@
 // ============================================================
 // lib/payments/sumit.ts
-// SUMIT payment provider adapter for Digitech Hub (V1 provider).
+// SUMIT (formerly OfficeGuy) payment provider — Redirect API.
 //
-// LIVE vs MOCK:
-//   * Live mode is OFF unless ALL of these are set:
-//       SUMIT_API_KEY, SUMIT_COMPANY_ID, SUMIT_WEBHOOK_SECRET, SUMIT_LIVE=true
-//   * Until then we run a MOCK hosted checkout so the full order ->
-//     webhook -> entitlement flow is testable end-to-end without real money.
-//   * Access is NEVER granted from the redirect — only the verified webhook
-//     (verifyWebhookSignature + parseWebhookEvent) drives entitlement creation.
+// Flow (NO webhooks):
+//   1. beginRedirect → SUMIT returns a hosted payment URL; we send the buyer there.
+//   2. SUMIT redirects back to our RedirectURL with ?OG-PaymentID=<id> appended.
+//   3. Our server confirm route calls getPayment(id) and grants access ONLY when
+//      ValidPayment === true. Access is NEVER granted from the redirect alone.
 //
-// SUMIT integration notes (fill in from real API docs before enabling live):
-//   * Hosted redirect / "דף תשלום": POST to SUMIT billing endpoint with company
-//     credentials + amount + a return URL; SUMIT returns a hosted payment URL.
-//   * Webhook: SUMIT posts payment notifications; verify with the shared secret
-//     (HMAC or token) then map to {providerEventId, type, transactionId, amount}.
+// Server-only: private credentials live in env and never reach the client.
+//   SUMIT_COMPANY_ID, SUMIT_API_KEY, SUMIT_API_BASE_URL (default api.sumit.co.il)
 // ============================================================
 
+import 'server-only';
 import crypto from 'crypto';
 
-export type SumitWebhookEvent = {
-  providerEventId: string;
-  eventType: string;          // e.g. payment.succeeded | payment.failed
-  status: 'paid' | 'failed' | 'unknown';
-  publicOrderId: string | null;
-  providerTransactionId: string | null;
-  amount: number | null;
-  currency: string | null;
-  raw: unknown;
-};
+const BASE_URL = process.env.SUMIT_API_BASE_URL || 'https://api.sumit.co.il';
 
-/** True only when every SUMIT credential is present and SUMIT_LIVE=true. */
-export function isSumitLive(): boolean {
-  return (
-    process.env.SUMIT_LIVE === 'true' &&
-    !!process.env.SUMIT_API_KEY &&
-    !!process.env.SUMIT_COMPANY_ID &&
-    !!process.env.SUMIT_WEBHOOK_SECRET
-  );
+/** True only when both private credentials are present. */
+export function isSumitConfigured(): boolean {
+  return !!process.env.SUMIT_COMPANY_ID && !!process.env.SUMIT_API_KEY;
+}
+
+function credentials() {
+  return {
+    CompanyID: Number(process.env.SUMIT_COMPANY_ID),
+    APIKey: process.env.SUMIT_API_KEY,
+  };
 }
 
 /** Human/url-safe order id, e.g. DGH-7F3K9Q2A. */
@@ -46,53 +35,108 @@ export function generatePublicOrderId(): string {
   return `DGH-${raw}`;
 }
 
-// NOTE: outbound hosted-checkout (createHostedCheckout) was removed in the V1
-// purchase system — the active paid path is the Make.com lead webhook
-// (see app/api/purchase + lib/payments/make-webhook). The inbound verified-
-// payment helpers below are kept for the FUTURE real-payment grant path.
+// ---- Request shapes (the non-secret parts are built by sumit-mapping.ts) ----
 
-/**
- * Verify an inbound webhook. Live: HMAC-SHA256 of the raw body with the shared
- * secret, compared to the provider signature header. Mock: a static token so
- * the local mock-checkout page can exercise the real handler.
- */
-export function verifyWebhookSignature(rawBody: string, signature: string | null): boolean {
-  if (!isSumitLive()) {
-    return signature === (process.env.SUMIT_MOCK_TOKEN ?? 'mock-sumit-token');
+export type SumitCustomer = {
+  Name: string;
+  EmailAddress: string;
+  Phone?: string | null;
+};
+
+export type SumitItem = {
+  Item: { Name: string };
+  Quantity: number;
+  UnitPrice: number;
+  Currency: string; // 'ILS'
+};
+
+export type BeginRedirectInput = {
+  customer: SumitCustomer;
+  item: SumitItem;
+  /** Absolute URL SUMIT returns the buyer to (our server confirm route). */
+  redirectUrl: string;
+  /** Our public order id — echoed for reconciliation. */
+  externalIdentifier: string;
+};
+
+export type BeginRedirectResult = { redirectUrl: string; paymentId: string | null };
+
+/** OfficeGuy/SUMIT response envelope: Status === 0 means success. */
+type SumitEnvelope<T> = {
+  Status: number;
+  UserErrorMessage?: string | null;
+  TechnicalErrorDetails?: string | null;
+  Data?: T;
+};
+
+async function postSumit<T>(path: string, body: Record<string, unknown>): Promise<SumitEnvelope<T>> {
+  const res = await fetch(`${BASE_URL}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ Credentials: credentials(), ...body }),
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!res.ok) {
+    const txt = await res.text().catch(() => '');
+    throw new Error(`SUMIT ${path} HTTP ${res.status}: ${txt.slice(0, 300)}`);
   }
-  if (!signature) return false;
-  const expected = crypto
-    .createHmac('sha256', process.env.SUMIT_WEBHOOK_SECRET!)
-    .update(rawBody)
-    .digest('hex');
-  try {
-    return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
-  } catch {
-    return false;
-  }
+  return (await res.json()) as SumitEnvelope<T>;
 }
 
-/** Normalise a raw webhook payload into our internal event shape. */
-export function parseWebhookEvent(payload: Record<string, unknown>): SumitWebhookEvent {
-  // MOCK payload shape (from /payment/mock-checkout):
-  //   { id, type, publicOrderId, transactionId, status, amount, currency }
-  // LIVE: remap from real SUMIT notification fields here.
-  const status =
-    payload.status === 'paid' || payload.type === 'payment.succeeded'
-      ? 'paid'
-      : payload.status === 'failed' || payload.type === 'payment.failed'
-        ? 'failed'
-        : 'unknown';
+/**
+ * Create a hosted Redirect payment and return the URL to send the buyer to.
+ * Throws (with SUMIT's message) when the provider rejects the request.
+ */
+export async function sumitBeginRedirect(input: BeginRedirectInput): Promise<BeginRedirectResult> {
+  if (!isSumitConfigured()) throw new Error('SUMIT is not configured (SUMIT_COMPANY_ID / SUMIT_API_KEY).');
 
-  return {
-    providerEventId: String(payload.id ?? payload.providerEventId ?? crypto.randomUUID()),
-    eventType: String(payload.type ?? payload.eventType ?? 'unknown'),
-    status,
-    publicOrderId: (payload.publicOrderId as string) ?? (payload.ExternalIdentifier as string) ?? null,
-    providerTransactionId:
-      (payload.transactionId as string) ?? (payload.PaymentID as string) ?? null,
-    amount: payload.amount != null ? Number(payload.amount) : null,
-    currency: (payload.currency as string) ?? null,
-    raw: payload,
-  };
+  const env = await postSumit<{ RedirectURL?: string; Payment?: { ID?: number | string }; PaymentID?: number | string }>(
+    '/billing/payments/beginredirect/',
+    {
+      Customer: input.customer,
+      Items: [input.item],
+      VATIncluded: true,
+      Language: 'Hebrew',
+      DraftDocument: false,
+      SendDocumentByEmail: true,
+      RedirectURL: input.redirectUrl,
+      ExternalIdentifier: input.externalIdentifier,
+    },
+  );
+
+  if (env.Status !== 0 || !env.Data?.RedirectURL) {
+    throw new Error(`SUMIT beginredirect failed: ${env.UserErrorMessage ?? `status ${env.Status}`}`);
+  }
+  const pid = env.Data.Payment?.ID ?? env.Data.PaymentID ?? null;
+  return { redirectUrl: env.Data.RedirectURL, paymentId: pid != null ? String(pid) : null };
+}
+
+export type SumitPaymentStatus = {
+  valid: boolean;
+  amount: number | null;
+  currency: string | null;
+  transactionId: string | null;
+  raw: unknown;
+};
+
+/**
+ * Server-side verification of a single payment by id. The confirm route grants
+ * access only when `valid` is true. Parsed defensively across SUMIT field shapes.
+ */
+export async function sumitGetPayment(paymentId: string): Promise<SumitPaymentStatus> {
+  if (!isSumitConfigured()) throw new Error('SUMIT is not configured.');
+
+  const env = await postSumit<{
+    Payment?: { ID?: number | string; ValidPayment?: boolean; Amount?: number; Currency?: string };
+    ValidPayment?: boolean;
+    Amount?: number;
+    Currency?: string;
+  }>('/billing/payments/get/', { PaymentID: paymentId });
+
+  const p = env.Data?.Payment;
+  const valid = env.Status === 0 && Boolean(p?.ValidPayment ?? env.Data?.ValidPayment);
+  const amount = p?.Amount ?? env.Data?.Amount ?? null;
+  const currency = p?.Currency ?? env.Data?.Currency ?? null;
+  const transactionId = (p?.ID ?? paymentId) != null ? String(p?.ID ?? paymentId) : null;
+  return { valid, amount: amount != null ? Number(amount) : null, currency, transactionId, raw: env };
 }

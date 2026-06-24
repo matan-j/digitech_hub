@@ -104,8 +104,13 @@ export default function AccessActionButton({
         body: JSON.stringify({ contentType: contentType ?? 'course', slug }),
       });
       const d = await res.json().catch(() => ({}));
+      if (res.ok && d?.status === 'redirect' && typeof d?.url === 'string') {
+        // paid → SUMIT hosted checkout (external). Full-page navigation.
+        window.location.assign(d.url as string);
+        return;
+      }
       if (res.ok && typeof d?.redirect === 'string') {
-        // free → branded success page; paid → branded pending page.
+        // free → branded internal success page.
         router.push(d.redirect);
         return;
       }
@@ -114,11 +119,11 @@ export default function AccessActionButton({
         setBusy(false);
         const info = await requireContactInfo();
         if (info) { await startPurchase(); return; }
-        setErr('צריך מספר טלפון כדי להשלים את בקשת הרכישה.');
+        setErr('צריך מספר טלפון כדי להשלים את הרכישה.');
         return;
       }
-      if (res.status === 502 && d?.error === 'webhook_failed') {
-        setErr('שליחת הבקשה נכשלה. נסו שוב.');
+      if (res.status === 502) {
+        setErr('פתיחת התשלום נכשלה. נסו שוב עוד רגע.');
         setBusy(false);
         return;
       }

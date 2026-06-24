@@ -1,36 +1,32 @@
 import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
-import { createClient, createServiceClient } from '@/lib/supabase/server';
+import { createClient } from '@/lib/supabase/server';
 import { resolveFinalPrice } from '@/lib/payments/pricing';
 import {
   createPendingOrder,
   getOpenPendingOrder,
-  markRequestWebhook,
+  setOrderProviderRef,
   markOrderPaid,
   type ContentType,
 } from '@/lib/payments/order-service';
 import { grantEntitlement } from '@/lib/payments/entitlement-service';
 import { enrollInCourse } from '@/lib/learn/enrollment';
 import { resolveAccessLevel } from '@/lib/learn/access';
-import {
-  sendPurchaseRequestWebhook,
-  israelDateTime,
-  type PurchaseWebhookPayload,
-} from '@/lib/payments/make-webhook';
+import { isSumitConfigured, sumitBeginRedirect } from '@/lib/payments/sumit';
+import { buildCustomer, buildRedirectItem } from '@/lib/payments/sumit-mapping';
 
 export const runtime = 'nodejs';
 
 const PURCHASABLE: ContentType[] = ['course', 'guide'];
 
 /**
- * POST { contentType, slug, phone? } — the single V1 purchase entry point.
+ * POST { contentType, slug } — the single V1 purchase entry point.
  *
- * Decision (server-trusted price; the client's numbers are never trusted):
- *   final price == 0  → FREE: grant access immediately, record it, redirect to
- *                       the branded success page.
- *   final price  > 0  → PAID: require a phone, create ONE pending order, fire the
- *                       Make.com lead webhook, redirect to the branded pending
- *                       page. NO access is granted and NO payment link is opened.
+ * Server-trusted price (the client's numbers are never read):
+ *   final == 0 → FREE: grant access immediately, record it, → success page.
+ *   final  > 0 → PAID: create ONE pending order, open a SUMIT hosted Redirect
+ *                checkout, and return its URL. NO access is granted here — that
+ *                happens only in /api/payments/sumit/confirm after SUMIT verifies.
  */
 export async function POST(request: Request) {
   const auth = await getCurrentUser();
@@ -39,7 +35,6 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}));
   const contentType = (body.contentType as ContentType | undefined) ?? 'course';
   const slug = body.slug as string | undefined;
-  const phoneInput = typeof body.phone === 'string' ? body.phone.trim() : '';
   if (!slug || !PURCHASABLE.includes(contentType)) {
     return NextResponse.json({ error: 'invalid_request' }, { status: 400 });
   }
@@ -60,7 +55,7 @@ export async function POST(request: Request) {
 
   // ----------------------------------------------------------------
   // FREE path — final price 0 (genuinely free OR fully discounted).
-  // Grant immediately and record it. Never send a payment webhook.
+  // Grant immediately and record it. No SUMIT payment is created.
   // ----------------------------------------------------------------
   if (price.isFree) {
     if (level === 'open' || level === 'login_required') {
@@ -69,8 +64,6 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: result.reason }, { status: 400 });
       }
     } else {
-      // purchase_required but final price is 0 → mint a 0-amount paid order and
-      // grant the entitlement (idempotent on user+resource).
       const existing = await getOpenPendingOrder(auth.userId, contentType, item.id);
       const order =
         existing ??
@@ -98,28 +91,29 @@ export async function POST(request: Request) {
   }
 
   // ----------------------------------------------------------------
-  // PAID path — request only. Pending order + lead webhook. No access.
+  // PAID path — open a SUMIT Redirect checkout. No access granted here.
   // ----------------------------------------------------------------
-
-  // Phone is required for the lead. Prefer the stored profile phone; accept and
-  // persist a freshly-collected one from the request.
   const { data: profileRow } = await supabase
     .from('profiles')
     .select('phone, full_name')
     .eq('id', auth.userId)
     .maybeSingle();
-  let phone = (profileRow?.phone as string | null) ?? '';
-  if (!phone && phoneInput) {
-    phone = phoneInput;
-    const service = createServiceClient();
-    await service.from('profiles').update({ phone }).eq('id', auth.userId);
-  }
+  const phone = (profileRow?.phone as string | null) ?? '';
   if (!phone) {
+    // The client gates on ContactInfoProvider; this is a server-side safety net.
     return NextResponse.json({ error: 'phone_required' }, { status: 400 });
   }
 
-  // Reuse an existing open order (idempotency) — never create a second one.
+  if (!isSumitConfigured()) {
+    return NextResponse.json({ error: 'provider_unconfigured' }, { status: 502 });
+  }
+
+  // Reuse an open order (idempotency). If it already has a checkout URL, reuse it
+  // instead of creating a second SUMIT payment on a double-click / refresh.
   const existing = await getOpenPendingOrder(auth.userId, contentType, item.id);
+  if (existing?.checkout_url) {
+    return NextResponse.json({ status: 'redirect', url: existing.checkout_url });
+  }
   const order =
     existing ??
     (await createPendingOrder({
@@ -129,47 +123,23 @@ export async function POST(request: Request) {
       amount: price.final,
       originalAmount: price.original,
       currency: price.currency,
+      provider: 'sumit',
     }));
 
-  // If we already sent the webhook for this open order, don't resend it on a
-  // double-click / refresh — just route to the pending page again.
-  if (existing && order.request_webhook_status === 'sent') {
-    return NextResponse.json({
-      status: 'pending',
-      redirect: `/learn/checkout/pending?order=${encodeURIComponent(order.public_order_id)}`,
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin;
+  const redirectUrl = `${appUrl}/api/payments/sumit/confirm?order=${encodeURIComponent(order.public_order_id)}`;
+
+  try {
+    const result = await sumitBeginRedirect({
+      customer: buildCustomer({ name: profileRow?.full_name as string | null, email: auth.email, phone }),
+      item: buildRedirectItem(item),
+      redirectUrl,
+      externalIdentifier: order.public_order_id,
     });
+    await setOrderProviderRef(order.id, { checkoutUrl: result.redirectUrl, transactionId: result.paymentId });
+    return NextResponse.json({ status: 'redirect', url: result.redirectUrl });
+  } catch (e) {
+    console.error('[purchase] SUMIT beginredirect failed', order.public_order_id, e);
+    return NextResponse.json({ error: 'payment_init_failed' }, { status: 502 });
   }
-
-  const payload: PurchaseWebhookPayload = {
-    customer_name: (profileRow?.full_name as string | null) ?? auth.profile.full_name ?? '',
-    customer_email: auth.email,
-    customer_phone: phone,
-    current_datetime: israelDateTime(),
-    products: [
-      {
-        product_name: item.title ?? slug,
-        price_before_discount: price.original,
-        price_after_discount: price.final,
-      },
-    ],
-    public_order_id: order.public_order_id,
-    user_id: auth.userId,
-    content_type: contentType,
-    content_id: item.id,
-  };
-
-  const sent = await sendPurchaseRequestWebhook(payload);
-  if (!sent.ok) {
-    await markRequestWebhook(order.id, 'failed', sent.error);
-    return NextResponse.json(
-      { error: 'webhook_failed', publicOrderId: order.public_order_id },
-      { status: 502 },
-    );
-  }
-  await markRequestWebhook(order.id, 'sent');
-
-  return NextResponse.json({
-    status: 'pending',
-    redirect: `/learn/checkout/pending?order=${encodeURIComponent(order.public_order_id)}`,
-  });
 }

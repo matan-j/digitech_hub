@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --experimental-strip-types --import ./scripts/ts-register.mjs --test lib/learn/__tests__/*.test.ts"
+    "test": "node --experimental-strip-types --import ./scripts/ts-register.mjs --test lib/learn/__tests__/*.test.ts lib/payments/__tests__/*.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",

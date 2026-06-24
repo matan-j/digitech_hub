@@ -106,6 +106,20 @@ export async function setOrderCheckoutUrl(orderId: string, checkoutUrl: string):
   if (error) throw new Error(`setOrderCheckoutUrl failed: ${error.message}`);
 }
 
+/** Persist the provider's hosted checkout URL + payment reference on a pending order. */
+export async function setOrderProviderRef(
+  orderId: string,
+  params: { checkoutUrl?: string | null; transactionId?: string | null },
+): Promise<void> {
+  const supabase = createServiceClient();
+  const patch: Record<string, unknown> = {};
+  if (params.checkoutUrl !== undefined) patch.checkout_url = params.checkoutUrl;
+  if (params.transactionId !== undefined) patch.provider_transaction_id = params.transactionId;
+  if (!Object.keys(patch).length) return;
+  const { error } = await supabase.from('orders').update(patch).eq('id', orderId);
+  if (error) throw new Error(`setOrderProviderRef failed: ${error.message}`);
+}
+
 export async function getOrderByPublicId(publicOrderId: string): Promise<Order | null> {
   const supabase = createServiceClient();
   const { data } = await supabase
