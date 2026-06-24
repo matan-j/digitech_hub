@@ -29,6 +29,8 @@ export type Course = {
   description: string;
   audience?: string;
   cover?: 'hero' | 'header';
+  /** Explicit cover image URL; when set, CourseCard renders it over the gradient. */
+  coverUrl?: string | null;
   lastUpdated?: string;
   lessons: Lesson[];
   linkedAgents?: { id: string; title: string; href: string }[];

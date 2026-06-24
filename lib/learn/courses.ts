@@ -39,6 +39,7 @@ function mapCourse(c: CourseWithLessons): Course {
     description: c.description ?? '',
     audience: c.audience ?? undefined,
     cover: (c.cover_style as 'hero' | 'header' | undefined) ?? 'hero',
+    coverUrl: c.cover_url ?? null,
     lastUpdated: c.updated_at ? new Intl.DateTimeFormat('he-IL', { dateStyle: 'short' }).format(new Date(c.updated_at)) : undefined,
     lessons: [...c.lessons].sort((a, b) => a.position - b.position).map(mapLesson),
   };
@@ -55,6 +56,7 @@ export async function listCourses(): Promise<Course[]> {
     description: c.description ?? '',
     audience: c.audience ?? undefined,
     cover: c.cover_style,
+    coverUrl: c.cover_url ?? null,
     lastUpdated: c.updated_at ? new Intl.DateTimeFormat('he-IL', { dateStyle: 'short' }).format(new Date(c.updated_at)) : undefined,
     lessons: [],
   }));

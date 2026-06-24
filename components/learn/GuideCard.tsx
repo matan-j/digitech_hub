@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { Clock } from 'lucide-react';
 import GuideThumbnail from './GuideThumbnail';
+import ShareButton from './ShareButton';
 import { DOMAIN_BY_ID, domainBadgeClasses } from '@/lib/learn/domains';
 import { CONTENT_KIND_SHORT } from '@/lib/learn/placeholder';
 import type { ContentItem } from '@/lib/learn/types';
@@ -32,6 +33,10 @@ export default function GuideCard({ guide }: { guide: ContentItem }) {
             {domainMeta.label}
           </span>
         )}
+        {/* Share sits above the stretched title link (z-20) so it stays clickable. */}
+        <div className="absolute bottom-3 left-3 z-20">
+          <ShareButton path={`/learn/guides/${guide.slug}`} title={guide.title} />
+        </div>
       </div>
 
       <div className="p-5 flex flex-col flex-1">

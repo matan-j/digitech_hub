@@ -31,14 +31,34 @@ export default function CourseCard({ course }: { course: Course }) {
               : 'linear-gradient(135deg, #2E1A5C 0%, #4B2E83 60%, #5F3E9C 100%)',
         }}
       >
-        <div
-          aria-hidden
-          className="absolute inset-0 opacity-40"
-          style={{
-            backgroundImage:
-              'radial-gradient(circle at 80% 25%, rgba(196,184,230,0.32), transparent 55%), radial-gradient(circle at 18% 88%, rgba(26,15,61,0.55), transparent 55%)',
-          }}
-        />
+        {course.coverUrl ? (
+          <>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={course.coverUrl}
+              alt=""
+              className="absolute inset-0 w-full h-full object-cover"
+            />
+            {/* Dark scrim keeps the overlaid title/badge readable. */}
+            <div
+              aria-hidden
+              className="absolute inset-0"
+              style={{
+                backgroundImage:
+                  'linear-gradient(180deg, rgba(26,15,61,0.15) 0%, rgba(26,15,61,0.75) 100%)',
+              }}
+            />
+          </>
+        ) : (
+          <div
+            aria-hidden
+            className="absolute inset-0 opacity-40"
+            style={{
+              backgroundImage:
+                'radial-gradient(circle at 80% 25%, rgba(196,184,230,0.32), transparent 55%), radial-gradient(circle at 18% 88%, rgba(26,15,61,0.55), transparent 55%)',
+            }}
+          />
+        )}
         <div className="absolute inset-0 p-5 flex flex-col justify-end">
           {course.audience && (
             <span className="self-start inline-flex items-center text-[11px] font-semibold uppercase tracking-wider text-white/85 bg-white/12 backdrop-blur-sm px-2.5 py-1 rounded-pill">

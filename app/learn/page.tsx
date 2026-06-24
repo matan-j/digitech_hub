@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { BookOpen, Compass, BookText, CheckCircle2, Library, ArrowLeft } from 'lucide-react';
 import { listCourses } from '@/lib/learn/courses';
 import CourseCard from '@/components/learn/CourseCard';
+import GuideCard from '@/components/learn/GuideCard';
 import { getCurrentUser } from '@/lib/auth';
 import { getCompletedLessonIds, listContent, listPlaybooks } from '@/lib/learn/db';
 import { getBrandCoverUrl } from '@/lib/brand';
@@ -68,7 +69,7 @@ export default async function LearnDashboard() {
             {displayName ? `היי ${displayName}, ברוך הבא חזרה` : 'ברוך הבא ל־DigiTech HUB'}
           </h1>
           <p className="mt-3 text-base sm:text-lg text-white/85 max-w-2xl">
-            מרכז הלמידה שלך לקורסים, מדריכים ופלייבוקים פרקטיים.
+            מרכז הלמידה שלך לקורסים, הדרכות ופלייבוקים פרקטיים.
           </p>
 
           {/* Quick actions */}
@@ -85,7 +86,7 @@ export default async function LearnDashboard() {
               href="/learn/guides"
               className="inline-flex items-center px-5 py-2.5 rounded-pill border border-white/25 text-white text-sm font-semibold hover:bg-white/10 transition-colors"
             >
-              גלה מדריכים
+              גלה הדרכות
             </Link>
             <Link
               href="/learn/playbooks"
@@ -128,7 +129,7 @@ export default async function LearnDashboard() {
           />
           <KpiCard
             icon={Compass}
-            label="מדריכים זמינים"
+            label="הדרכות זמינות"
             value={publishedGuides.length}
             hint="לקריאה עצמאית"
           />
@@ -165,7 +166,7 @@ export default async function LearnDashboard() {
             cta={
               isAdmin
                 ? { label: 'צור קורס ראשון', href: '/admin/courses/new' }
-                : { label: 'עבור למדריכים', href: '/learn/guides' }
+                : { label: 'עבור להדרכות', href: '/learn/guides' }
             }
           />
         ) : (
@@ -182,31 +183,19 @@ export default async function LearnDashboard() {
         <section className="mt-12">
           <div className="flex items-end justify-between mb-5">
             <div>
-              <h2 className="text-xl sm:text-2xl font-extrabold text-neutral-950">מדריכים</h2>
+              <h2 className="text-xl sm:text-2xl font-extrabold text-neutral-950">הדרכות</h2>
               <p className="text-sm text-neutral-500 mt-1">קריאה עצמאית קצרה וממוקדת.</p>
             </div>
             <Link
               href="/learn/guides"
               className="text-sm font-semibold text-brand-purple-700 hover:text-brand-purple-500"
             >
-              לכל המדריכים →
+              לכל ההדרכות →
             </Link>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {publishedGuides.slice(0, 3).map((g) => (
-              <Link
-                key={g.id}
-                href={`/learn/guides/${g.slug}`}
-                className="group block bg-white rounded-card border border-neutral-200 p-6 hover:border-brand-purple-700 transition-colors"
-                style={{ boxShadow: 'var(--shadow-card)' }}
-              >
-                <h3 className="font-extrabold text-neutral-950 group-hover:text-brand-purple-700 transition-colors">
-                  {g.title}
-                </h3>
-                {g.tagline && (
-                  <p className="text-sm text-neutral-500 mt-1.5 line-clamp-2">{g.tagline}</p>
-                )}
-              </Link>
+              <GuideCard key={g.id} guide={g} />
             ))}
           </div>
         </section>
