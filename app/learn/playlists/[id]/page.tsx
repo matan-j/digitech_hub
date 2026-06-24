@@ -43,7 +43,7 @@ export default async function PlaylistPage({ params }: { params: Promise<{ id: s
     <div className="px-4 sm:px-6 lg:px-10 py-6 lg:py-10 max-w-5xl mx-auto">
       <Link href="/learn/guides" className="inline-flex items-center gap-1 text-sm text-neutral-500 hover:text-neutral-900 mb-6">
         <ArrowRight className="w-3.5 h-3.5" />
-        חזרה למדריכים
+        חזרה להדרכות
       </Link>
 
       {/* Hero */}
@@ -82,7 +82,7 @@ export default async function PlaylistPage({ params }: { params: Promise<{ id: s
                 </Link>
               )}
               <span className="flex items-center gap-1">
-                <ListVideo className="w-3.5 h-3.5" /> {guides.length} מדריכים
+                <ListVideo className="w-3.5 h-3.5" /> {guides.length} הדרכות
               </span>
               {totalMinutes > 0 && (
                 <span className="flex items-center gap-1">
@@ -96,7 +96,7 @@ export default async function PlaylistPage({ params }: { params: Promise<{ id: s
 
       {/* Ordered guide list */}
       {guides.length === 0 ? (
-        <EmptyState icon={ListVideo} title="אין עדיין מדריכים בפלייליסט" />
+        <EmptyState icon={ListVideo} title="אין עדיין הדרכות בפלייליסט" />
       ) : (
         <ol className="space-y-3">
           {guides.map((g, i) => (

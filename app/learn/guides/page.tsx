@@ -9,7 +9,7 @@ import {
 } from '@/lib/learn/db';
 import GuidesHub, { type HubCreator, type HubPlaylist, type HubCategory } from '@/components/learn/GuidesHub';
 
-export const metadata = { title: 'מדריכים · DigiTech HUB' };
+export const metadata = { title: 'הדרכות · DigiTech HUB' };
 export const dynamic = 'force-dynamic';
 
 export default async function GuidesIndex() {
@@ -49,10 +49,10 @@ export default async function GuidesIndex() {
       <header className="mb-8">
         <div className="flex items-center gap-2 mb-2.5">
           <Compass className="w-4 h-4 text-brand-purple-700" />
-          <span className="text-[11px] font-extrabold text-brand-purple-700 uppercase tracking-[0.18em]">מדריכים</span>
+          <span className="text-[11px] font-extrabold text-brand-purple-700 uppercase tracking-[0.18em]">הדרכות</span>
         </div>
-        <h1 className="text-2xl sm:text-3xl font-extrabold text-neutral-950">מדריכים</h1>
-        <p className="text-sm text-neutral-700 mt-1.5">מדריכים פרקטיים, סרטונים וקבצי PDF ללמידה עצמאית.</p>
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-neutral-950">הדרכות</h1>
+        <p className="text-sm text-neutral-700 mt-1.5">הדרכות פרקטיות, סרטונים וקבצי PDF ללמידה עצמאית.</p>
       </header>
 
       <GuidesHub

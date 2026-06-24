@@ -34,6 +34,11 @@ export default function HomepageStudio({ initial }: { initial: HomepageSection[]
     }
   }, []);
 
+  const saveNow = useCallback(() => {
+    if (timer.current) clearTimeout(timer.current);
+    void persist(sections);
+  }, [persist, sections]);
+
   useEffect(() => {
     if (!dirty.current) { dirty.current = true; return; }
     setSaveState('dirty');
@@ -72,7 +77,7 @@ export default function HomepageStudio({ initial }: { initial: HomepageSection[]
             </p>
           </div>
           <div className="flex flex-col items-end gap-2 shrink-0">
-            <SaveIndicator state={saveState} />
+            <SaveIndicator state={saveState} onForceSave={saveNow} />
             <a
               href="/"
               target="_blank"

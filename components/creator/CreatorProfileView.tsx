@@ -32,7 +32,7 @@ type TabId = 'overview' | 'guides' | 'playlists' | 'about';
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'overview', label: 'ראשי' },
-  { id: 'guides', label: 'מדריכים' },
+  { id: 'guides', label: 'הדרכות' },
   { id: 'playlists', label: 'פלייליסטים' },
   { id: 'about', label: 'אודות' },
 ];
@@ -186,7 +186,7 @@ export default function CreatorProfileView({
       {/* ───────── Stats strip ───────── */}
       <div className="bg-white border-b border-neutral-200">
         <div className="px-4 sm:px-6 lg:px-10 max-w-5xl mx-auto py-4 flex flex-wrap items-center gap-x-7 gap-y-3">
-          <Stat icon={BookOpen} value={stats.guides} label="מדריכים" />
+          <Stat icon={BookOpen} value={stats.guides} label="הדרכות" />
           <Stat icon={ListVideo} value={stats.playlists} label="פלייליסטים" />
           <Stat icon={Eye} value={stats.views} label="צפיות" />
         </div>
@@ -251,9 +251,9 @@ export default function CreatorProfileView({
             )}
 
             <section>
-              <h2 className="text-lg font-extrabold text-neutral-950 mb-4">מדריכים אחרונים</h2>
+              <h2 className="text-lg font-extrabold text-neutral-950 mb-4">הדרכות אחרונות</h2>
               {latestGuides.length === 0 ? (
-                <EmptyState icon={BookOpen} title="עדיין אין מדריכים ליוצר הזה" message="בקרוב יתווסף כאן תוכן חדש." compact />
+                <EmptyState icon={BookOpen} title="עדיין אין הדרכות ליוצר הזה" message="בקרוב יתווסף כאן תוכן חדש." compact />
               ) : (
                 <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
                   {latestGuides.map((g) => (
@@ -267,9 +267,9 @@ export default function CreatorProfileView({
 
         {tab === 'guides' && (
           <section>
-            <h2 className="text-lg font-extrabold text-neutral-950 mb-4">כל המדריכים</h2>
+            <h2 className="text-lg font-extrabold text-neutral-950 mb-4">כל ההדרכות</h2>
             {guides.length === 0 ? (
-              <EmptyState icon={BookOpen} title="עדיין אין מדריכים ליוצר הזה" message="בקרוב יתווסף כאן תוכן חדש." compact />
+              <EmptyState icon={BookOpen} title="עדיין אין הדרכות ליוצר הזה" message="בקרוב יתווסף כאן תוכן חדש." compact />
             ) : (
               <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
                 {guides.map((g) => (

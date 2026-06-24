@@ -20,7 +20,7 @@ export default async function AdminDashboard() {
     {
       href: '/admin/guides',
       newHref: '/admin/guides/new',
-      label: 'מדריכים',
+      label: 'הדרכות',
       icon: Compass,
       stat: counts.guides.total,
       sub: `${counts.guides.published} מפורסמים`,
@@ -77,7 +77,7 @@ export default async function AdminDashboard() {
         <h2 className="text-sm font-extrabold text-neutral-500 uppercase tracking-wide mb-3">פעולות מהירות</h2>
         <div className="grid sm:grid-cols-2 gap-3">
           <Link href="/admin/guides/new" className="bg-white rounded-xl border border-neutral-200 p-4 hover:border-brand-purple-300 transition-colors">
-            <div className="font-semibold text-neutral-900">צור מדריך חדש</div>
+            <div className="font-semibold text-neutral-900">צור הדרכה חדשה</div>
             <div className="text-xs text-neutral-500 mt-0.5">תוכן ארוך עם markdown, תמונות, וידאו וקישורים</div>
           </Link>
           <Link href="/admin/courses/new" className="bg-white rounded-xl border border-neutral-200 p-4 hover:border-brand-purple-300 transition-colors">

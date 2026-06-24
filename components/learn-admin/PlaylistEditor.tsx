@@ -77,6 +77,11 @@ export default function PlaylistEditor({
 
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
 
+  const saveNow = useCallback(() => {
+    if (timer.current) clearTimeout(timer.current);
+    void persist(buildPayload());
+  }, [persist, buildPayload]);
+
   async function togglePublish() {
     const next = status === 'published' ? 'draft' : 'published';
     const ok = await persist(buildPayload({ status: next }));
@@ -114,7 +119,7 @@ export default function PlaylistEditor({
             placeholder="שם הפלייליסט"
             className="flex-1 text-2xl font-extrabold text-neutral-950 bg-transparent border-0 focus:outline-none focus:bg-neutral-50 rounded px-2 -mx-2 py-1"
           />
-          <SaveIndicator state={saveState} />
+          <SaveIndicator state={saveState} onForceSave={saveNow} />
         </div>
         <div className="flex items-center gap-3 pt-3 border-t border-neutral-100">
           <button
@@ -160,9 +165,9 @@ export default function PlaylistEditor({
       />
 
       <section className="bg-white rounded-2xl border border-neutral-200 p-5">
-        <h2 className="text-sm font-extrabold text-neutral-700 uppercase tracking-wide mb-3">מדריכים בפלייליסט</h2>
+        <h2 className="text-sm font-extrabold text-neutral-700 uppercase tracking-wide mb-3">הדרכות בפלייליסט</h2>
         {orderedIds.length === 0 ? (
-          <p className="text-sm text-neutral-500 mb-4">עדיין לא נוספו מדריכים. הוסף מהרשימה למטה.</p>
+          <p className="text-sm text-neutral-500 mb-4">עדיין לא נוספו הדרכות. הוסף מהרשימה למטה.</p>
         ) : (
           <ol className="space-y-2 mb-4">
             {orderedIds.map((id, idx) => (
@@ -179,7 +184,7 @@ export default function PlaylistEditor({
 
         {notAdded.length > 0 && (
           <div className="pt-3 border-t border-neutral-100">
-            <p className="text-xs font-semibold text-neutral-500 mb-2">הוסף מדריך</p>
+            <p className="text-xs font-semibold text-neutral-500 mb-2">הוסף הדרכה</p>
             <div className="flex flex-wrap gap-2">
               {notAdded.map((g) => (
                 <button key={g.id} type="button" onClick={() => add(g.id)} className="inline-flex items-center gap-1 px-3 py-1.5 rounded-pill text-xs font-medium bg-brand-purple-50 text-brand-purple-700 hover:bg-brand-purple-100 transition-colors">

@@ -3,7 +3,7 @@ import { listContent } from '@/lib/learn/db';
 import { Plus, FileText } from 'lucide-react';
 import ContentTabs from '@/components/learn-admin/ContentTabs';
 
-export const metadata = { title: 'ניהול מדריכים — Digitech Learning Hub' };
+export const metadata = { title: 'ניהול הדרכות — Digitech Learning Hub' };
 export const dynamic = 'force-dynamic';
 
 function formatDate(iso: string | null) {
@@ -23,14 +23,14 @@ export default async function GuidesAdminIndex() {
       <ContentTabs />
       <header className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-extrabold text-neutral-950">מדריכים</h1>
+          <h1 className="text-2xl font-extrabold text-neutral-950">הדרכות</h1>
           <p className="text-sm text-neutral-500 mt-1">תוכן ארוך עם markdown, תמונות וקישורים.</p>
         </div>
         <Link
           href="/admin/guides/new"
           className="flex items-center gap-2 px-4 py-2 rounded-pill bg-brand-purple-700 hover:bg-brand-purple-600 text-white text-sm font-semibold transition-colors"
         >
-          <Plus className="w-4 h-4" /> מדריך חדש
+          <Plus className="w-4 h-4" /> הדרכה חדשה
         </Link>
       </header>
 
@@ -39,13 +39,13 @@ export default async function GuidesAdminIndex() {
           <div className="w-12 h-12 mx-auto mb-3 rounded-pill bg-brand-purple-50 flex items-center justify-center text-brand-purple-600">
             <FileText className="w-6 h-6" />
           </div>
-          <h3 className="font-extrabold text-neutral-900 mb-1">עוד אין מדריכים</h3>
-          <p className="text-sm text-neutral-500 mb-4">צור מדריך ראשון כדי להתחיל.</p>
+          <h3 className="font-extrabold text-neutral-900 mb-1">עוד אין הדרכות</h3>
+          <p className="text-sm text-neutral-500 mb-4">צור הדרכה ראשונה כדי להתחיל.</p>
           <Link
             href="/admin/guides/new"
             className="inline-flex items-center gap-2 px-4 py-2 rounded-pill bg-brand-purple-700 hover:bg-brand-purple-600 text-white text-sm font-semibold transition-colors"
           >
-            <Plus className="w-4 h-4" /> צור מדריך חדש
+            <Plus className="w-4 h-4" /> צור הדרכה חדשה
           </Link>
         </div>
       ) : (

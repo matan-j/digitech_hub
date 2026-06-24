@@ -9,7 +9,7 @@ export const metadata = {
 
 const PERKS = [
   'גישה מלאה לכל הקורסים',
-  'כל המדריכים והפלייבוקים',
+  'כל ההדרכות והפלייבוקים',
   'מעקב התקדמות אישי',
   'תוכן חדש מתעדכן באופן שוטף',
 ];
@@ -41,7 +41,7 @@ export default async function UpgradePage({ searchParams }: Props) {
             פתח גישה מלאה ל-Learning Hub
           </h1>
           <p className="text-neutral-600 mb-6">
-            מנוי חודשי לכל התוכן — קורסים, מדריכים, פלייבוקים והכל בלי הגבלה.
+            מנוי חודשי לכל התוכן — קורסים, הדרכות, פלייבוקים והכל בלי הגבלה.
           </p>
 
           <ul className="space-y-2 mb-8">

@@ -6,7 +6,7 @@ import CreatorDashboardNav from '@/components/creator/CreatorDashboardNav';
 import EmptyState from '@/components/learn/EmptyState';
 import { CONTENT_KIND_LABEL } from '@/lib/learn/placeholder';
 
-export const metadata = { title: 'המדריכים שלי · לוח יוצר' };
+export const metadata = { title: 'ההדרכות שלי · לוח יוצר' };
 export const dynamic = 'force-dynamic';
 
 export default async function CreatorGuidesPage() {
@@ -19,14 +19,14 @@ export default async function CreatorGuidesPage() {
       <CreatorDashboardNav />
 
       <div className="flex items-center justify-between mb-5">
-        <h2 className="text-lg font-extrabold text-neutral-950">המדריכים שלי</h2>
+        <h2 className="text-lg font-extrabold text-neutral-950">ההדרכות שלי</h2>
         <Link href="/learn/creator/guides/new" className="inline-flex items-center gap-2 px-4 py-2 rounded-pill bg-brand-purple-700 hover:bg-brand-purple-600 text-white text-sm font-semibold transition-colors">
-          <Plus className="w-4 h-4" /> מדריך חדש
+          <Plus className="w-4 h-4" /> הדרכה חדשה
         </Link>
       </div>
 
       {guides.length === 0 ? (
-        <EmptyState icon={BookOpen} title="אין עדיין מדריכים" message="צור את המדריך הראשון שלך כדי להתחיל." cta={{ label: 'מדריך חדש', href: '/learn/creator/guides/new' }} />
+        <EmptyState icon={BookOpen} title="אין עדיין הדרכות" message="צור את ההדרכה הראשונה שלך כדי להתחיל." cta={{ label: 'הדרכה חדשה', href: '/learn/creator/guides/new' }} />
       ) : (
         <div className="bg-white rounded-card border border-neutral-200 overflow-hidden" style={{ boxShadow: 'var(--shadow-card)' }}>
           <table className="w-full text-sm">

@@ -105,6 +105,7 @@ export default function NodeEditor(props: Props) {
   const [vimeoId, setVimeoId] = useState(node.vimeo_id ?? '');
   const [duration, setDuration] = useState(node.duration ?? '');
   const [body, setBody] = useState(node.body ?? '');
+  const [isPreview, setIsPreview] = useState(kind === 'lesson' ? ((node as DbLesson).is_preview ?? false) : false);
   const [resources, setResources] = useState<DbResource[]>(node.resources ?? []);
   const [saveBadge, setSaveBadge] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [moveOpen, setMoveOpen] = useState(false);
@@ -149,10 +150,11 @@ export default function NodeEditor(props: Props) {
         vimeo_id: vimeoId || null,
         duration: duration || null,
         body: body || null,
+        ...(kind === 'lesson' ? { is_preview: isPreview } : {}),
       });
     }, 1200);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [title, vimeoId, duration, body]);
+  }, [title, vimeoId, duration, body, isPreview]);
 
   useEffect(() => () => { if (saveTimer.current) clearTimeout(saveTimer.current); }, []);
 
@@ -286,6 +288,18 @@ export default function NodeEditor(props: Props) {
             <label className="block text-xs font-semibold text-neutral-600 mb-1">תוכן (טקסט עשיר, אופציונלי)</label>
             <MarkdownEditor value={body} onChange={setBody} rows={8} showTimestamp />
           </div>
+
+          {kind === 'lesson' && (
+            <label className="flex items-center gap-2 text-xs cursor-pointer">
+              <input
+                type="checkbox"
+                checked={isPreview}
+                onChange={(e) => setIsPreview(e.target.checked)}
+                className="w-3.5 h-3.5 accent-brand-purple-700"
+              />
+              <span className="font-medium text-neutral-700">שיעור חופשי — נגיש גם ללא רכישה (תצוגה מקדימה)</span>
+            </label>
+          )}
 
           <div>
             <div className="flex items-center justify-between mb-2">

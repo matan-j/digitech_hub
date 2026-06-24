@@ -20,9 +20,9 @@ type NavItem = {
 };
 
 const TOP: NavItem[] = [
-  { label: 'דאשבורד', href: '/learn', icon: Home },
+  { label: 'עמוד הבית', href: '/learn', icon: Home },
   { label: 'קורסים', href: '/learn/courses', icon: BookOpen },
-  { label: 'מדריכים', href: '/learn/guides', icon: Compass },
+  { label: 'הדרכות', href: '/learn/guides', icon: Compass },
   { label: 'פלייבוקים', href: '/learn/playbooks', icon: BookText },
   { label: 'יוצרים', href: '/learn/creators', icon: Users },
 ];

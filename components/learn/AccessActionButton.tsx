@@ -12,7 +12,8 @@ import type { ContentType } from '@/lib/payments/order-service';
  * payment APIs (Phase 1B wiring).
  *
  *  enroll    — free course: register (if anon) → POST /api/enrollments → open lesson.
- *  purchase  — paid item: register (if anon) → POST /api/payments/sumit/create-redirect → checkout.
+ *  purchase  — paid item: register (if anon) → POST /api/purchase → pending page
+ *              (final price 0 grants immediately + success page). No payment link.
  *  subscribe — legacy all-access: register (if anon) → /upgrade.
  *  login     — login_required body: register (if anon) → reveal content on return.
  *  continue  — viewer already has access: plain navigation, no gate.
@@ -49,6 +50,10 @@ export default function AccessActionButton({
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  // Shown when a logged-in buyer has no phone on file — collected before the
+  // purchase webhook can be sent.
+  const [phoneNeeded, setPhoneNeeded] = useState(false);
+  const [phone, setPhone] = useState('');
 
   // Already-accessible content → a plain link, no gate, no JS round-trip.
   if (kind === 'continue' && targetHref) {
@@ -83,26 +88,44 @@ export default function AccessActionButton({
     }
   }
 
-  async function startCheckout() {
+  async function startPurchase(phoneArg?: string) {
     setBusy(true);
     setErr(null);
     try {
-      const res = await fetch('/api/payments/sumit/create-redirect', {
+      const res = await fetch('/api/purchase', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contentType, slug }),
+        body: JSON.stringify({ contentType: contentType ?? 'course', slug, phone: phoneArg }),
       });
       const d = await res.json().catch(() => ({}));
-      if (!res.ok || !d?.checkoutUrl) {
-        setErr(d?.error === 'no_price_set' ? 'טרם הוגדר מחיר לפריט.' : 'שגיאה בפתיחת התשלום.');
+      if (res.ok && typeof d?.redirect === 'string') {
+        // free → branded success page; paid → branded pending page.
+        router.push(d.redirect);
+        return;
+      }
+      if (res.status === 400 && d?.error === 'phone_required') {
+        setPhoneNeeded(true);
         setBusy(false);
         return;
       }
-      window.location.assign(d.checkoutUrl as string);
+      if (res.status === 502 && d?.error === 'webhook_failed') {
+        setErr('שליחת הבקשה נכשלה. נסו שוב.');
+        setBusy(false);
+        return;
+      }
+      setErr('שגיאה בביצוע הרכישה. נסו שוב.');
+      setBusy(false);
     } catch {
       setErr('שגיאת רשת.');
       setBusy(false);
     }
+  }
+
+  function submitPhone() {
+    const trimmed = phone.trim();
+    if (!trimmed) { setErr('נא להזין מספר טלפון.'); return; }
+    setPhoneNeeded(false);
+    void startPurchase(trimmed);
   }
 
   function onClick() {
@@ -118,7 +141,7 @@ export default function AccessActionButton({
       kind === 'enroll'
         ? enrollThenGo
         : kind === 'purchase'
-          ? startCheckout
+          ? () => startPurchase()
           : kind === 'subscribe'
             ? () => window.location.assign(`/upgrade?return=${encodeURIComponent(returnTo)}`)
             : () => router.refresh(); // 'login' — authed path reveals the body
@@ -131,6 +154,29 @@ export default function AccessActionButton({
         {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : icon}
         {label}
       </button>
+      {phoneNeeded && (
+        <span className="mt-2 flex items-center gap-2">
+          <input
+            type="tel"
+            inputMode="tel"
+            dir="ltr"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); submitPhone(); } }}
+            placeholder="מספר טלפון"
+            className="px-3 py-2 rounded-pill border border-neutral-300 text-sm text-neutral-900 bg-white focus:outline-none focus:border-brand-purple-400 w-44"
+          />
+          <button
+            type="button"
+            onClick={submitPhone}
+            disabled={busy}
+            className="px-4 py-2 rounded-pill bg-brand-purple-700 hover:bg-brand-purple-600 text-white text-sm font-semibold disabled:opacity-70"
+          >
+            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : 'המשך'}
+          </button>
+        </span>
+      )}
+      {phoneNeeded && <span className="mt-1 text-[11px] text-brand-purple-100">צריך מספר טלפון כדי להשלים את בקשת הרכישה.</span>}
       {err && <span className={errorClassName}>{err}</span>}
     </span>
   );

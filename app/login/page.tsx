@@ -95,12 +95,12 @@ export default async function LoginPage({ searchParams }: Props) {
             <span className="text-brand-purple-100">שיעור אחד כל פעם.</span>
           </h2>
           <p className="mt-4 text-white/75 text-base xl:text-lg leading-relaxed max-w-sm">
-            קורסים, מדריכים ופלייבוקים פרקטיים — נבחרים בקפידה כדי שתתקדם, לא רק תצרוך תוכן.
+            קורסים, הדרכות ופלייבוקים פרקטיים — נבחרים בקפידה כדי שתתקדם, לא רק תצרוך תוכן.
           </p>
 
           <ul className="mt-8 space-y-3 text-sm">
             <Bullet icon={BookOpen}>גישה מלאה לכל הקורסים</Bullet>
-            <Bullet icon={Compass}>מדריכים פרקטיים שמכוונים לפעולה</Bullet>
+            <Bullet icon={Compass}>הדרכות פרקטיות שמכוונות לפעולה</Bullet>
             <Bullet icon={Sparkles}>פלייבוקים מבוססי AI מותאמים אליך</Bullet>
           </ul>
         </div>
@@ -141,7 +141,7 @@ export default async function LoginPage({ searchParams }: Props) {
 
           <h1 className="text-2xl sm:text-3xl font-extrabold text-neutral-950 mb-1.5">ברוך הבא</h1>
           <p className="text-sm text-neutral-700 mb-6">
-            התחבר כדי להמשיך לקורסים, המדריכים והפלייבוקים שלך.
+            התחבר כדי להמשיך לקורסים, ההדרכות והפלייבוקים שלך.
           </p>
 
           {errorLabel && (

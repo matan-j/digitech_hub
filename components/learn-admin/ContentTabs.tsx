@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 const TABS = [
-  { href: '/admin/guides', label: 'מדריכים' },
+  { href: '/admin/guides', label: 'הדרכות' },
   { href: '/admin/playlists', label: 'פלייליסטים' },
   { href: '/admin/creators', label: 'יוצרים' },
 ] as const;

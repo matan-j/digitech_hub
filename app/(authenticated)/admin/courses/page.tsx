@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { listContent } from '@/lib/learn/db';
 import { Plus, BookOpen } from 'lucide-react';
 import ImportLegacyButton from './ImportLegacyButton';
+import DuplicateCourseButton from './DuplicateCourseButton';
 
 export const metadata = { title: 'ניהול קורסים — Digitech Learning Hub' };
 export const dynamic = 'force-dynamic';
@@ -55,6 +56,7 @@ export default async function CoursesAdminIndex() {
                 <th className="text-right px-4 py-3 font-semibold">סטטוס</th>
                 <th className="text-right px-4 py-3 font-semibold">מנוי</th>
                 <th className="text-right px-4 py-3 font-semibold">עודכן</th>
+                <th className="px-4 py-3" />
               </tr>
             </thead>
             <tbody>
@@ -87,6 +89,9 @@ export default async function CoursesAdminIndex() {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-neutral-500 text-xs">{formatDate(c.updated_at)}</td>
+                  <td className="px-4 py-3">
+                    <DuplicateCourseButton slug={c.slug} />
+                  </td>
                 </tr>
               ))}
             </tbody>

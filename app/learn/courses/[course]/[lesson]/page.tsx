@@ -6,6 +6,7 @@ import RichContentRenderer from '@/components/learn/RichContentRenderer';
 import ContentTableOfContents from '@/components/learn/ContentTableOfContents';
 import { toRichBlocks, extractToc } from '@/lib/learn/rich-content';
 import { getCurrentUser, hasPremiumAccess } from '@/lib/auth';
+import { hasActiveEntitlement } from '@/lib/payments/entitlement-service';
 import { getCompletedLessonIds, getCourseWithLessons } from '@/lib/learn/db';
 import VimeoPlayer from '@/components/learn/VimeoPlayer';
 import CourseSidebar from '@/components/learn/CourseSidebar';
@@ -23,19 +24,34 @@ export default async function LessonPage({
   const { course: courseSlug, lesson: lessonSlug } = await params;
   const data = await getLesson(courseSlug, lessonSlug);
   if (!data) notFound();
-  const { course, lesson, prev, next, lessonId, isPremium } = data;
+  const { course, lesson, prev, next, lessonId, isPremium, accessLevel, courseId, isPreviewLesson } = data;
   // Table of contents only for long written lessons (3+ H2 sections).
   const lessonToc = lesson.body ? extractToc(toRichBlocks(lesson.body)) : [];
 
+  const returnTo = `/learn/courses/${courseSlug}/${lessonSlug}`;
+  const auth = await getCurrentUser();
+
+  // Legacy subscription gate (is_premium / subscription_required).
   if (isPremium) {
-    const auth = await getCurrentUser();
-    if (!auth) redirect(`/login?return=${encodeURIComponent(`/learn/courses/${courseSlug}/${lessonSlug}`)}`);
+    if (!auth) redirect(`/login?return=${encodeURIComponent(returnTo)}`);
     if (!hasPremiumAccess(auth.profile)) {
-      redirect(`/upgrade?return=${encodeURIComponent(`/learn/courses/${courseSlug}/${lessonSlug}`)}`);
+      redirect(`/upgrade?return=${encodeURIComponent(returnTo)}`);
     }
   }
 
-  const auth = await getCurrentUser();
+  // login_required courses: body needs a session.
+  if (accessLevel === 'login_required' && !auth) {
+    redirect(`/login?return=${encodeURIComponent(returnTo)}`);
+  }
+
+  // purchase_required: free preview lessons stay open; everything else needs an
+  // active entitlement (admins/subscribers exempt). Non-entitled viewers are
+  // sent to the course landing where the lock + purchase CTA lives.
+  if (accessLevel === 'purchase_required' && !isPreviewLesson) {
+    if (!auth) redirect(`/login?return=${encodeURIComponent(returnTo)}`);
+    const entitled = hasPremiumAccess(auth.profile) || (await hasActiveEntitlement('course', courseId));
+    if (!entitled) redirect(`/learn/courses/${courseSlug}`);
+  }
   // Resolve completed lesson slugs (CourseSidebar expects slugs, not UUIDs)
   let completedSlugs: string[] = [];
   if (auth) {

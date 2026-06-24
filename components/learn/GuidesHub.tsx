@@ -149,7 +149,7 @@ export default function GuidesHub({ featuredGuides, creators, playlists, guides,
           {/* 1 — Featured Guides (content-first: largest visual priority) */}
           {featuredGuides.length > 0 && (
             <section>
-              <SectionHeader icon={Sparkles} title="מדריכים מומלצים" />
+              <SectionHeader icon={Sparkles} title="הדרכות מומלצות" />
               <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
                 {featuredGuides.map((g) => (
                   <GuideCard key={g.id} guide={g} />
@@ -184,11 +184,11 @@ export default function GuidesHub({ featuredGuides, creators, playlists, guides,
 
           {/* 4 — Latest Guides */}
           <section>
-            <SectionHeader icon={Compass} title="המדריכים האחרונים" />
+            <SectionHeader icon={Compass} title="ההדרכות האחרונות" />
             {guides.length === 0 ? (
               <EmptyState
                 icon={Compass}
-                title="אין עדיין מדריכים"
+                title="אין עדיין הדרכות"
                 message="תוכן חדש מתפרסם כל הזמן — בדוק שוב בקרוב."
               />
             ) : (

@@ -26,14 +26,14 @@ export default async function CreatorPlaylistsPage() {
       </div>
 
       {playlists.length === 0 ? (
-        <EmptyState icon={ListVideo} title="אין עדיין פלייליסטים" message="ארגן את המדריכים שלך לסדרות נושאיות." cta={{ label: 'פלייליסט חדש', href: '/learn/creator/playlists/new' }} />
+        <EmptyState icon={ListVideo} title="אין עדיין פלייליסטים" message="ארגן את ההדרכות שלך לסדרות נושאיות." cta={{ label: 'פלייליסט חדש', href: '/learn/creator/playlists/new' }} />
       ) : (
         <div className="bg-white rounded-card border border-neutral-200 overflow-hidden" style={{ boxShadow: 'var(--shadow-card)' }}>
           <table className="w-full text-sm">
             <thead className="bg-neutral-50 text-neutral-500 text-xs uppercase">
               <tr>
                 <th className="text-right px-4 py-3 font-semibold">כותרת</th>
-                <th className="text-right px-4 py-3 font-semibold">מדריכים</th>
+                <th className="text-right px-4 py-3 font-semibold">הדרכות</th>
                 <th className="text-right px-4 py-3 font-semibold">סטטוס</th>
               </tr>
             </thead>

@@ -2,7 +2,7 @@ import Link from 'next/link';
 
 const NAV = [
   { label: 'קורסים', href: '/learn/courses' },
-  { label: 'מדריכים', href: '/learn/guides' },
+  { label: 'הדרכות', href: '/learn/guides' },
   { label: 'יוצרים', href: '/learn/creators' },
   { label: 'פלייליסטים', href: '/learn/playlists' },
   { label: 'מחירים', href: '/pricing' },

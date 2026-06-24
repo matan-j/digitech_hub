@@ -39,7 +39,7 @@ const HEADERS = [
   'utm_medium',
   'utm_campaign',
   'utm_content',
-  'מדריך ראשון',
+  'הדרכה ראשונה',
   'יוצר ראשון',
   'קורס ראשון',
   'פעולה מבוקשת',

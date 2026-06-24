@@ -1,9 +1,9 @@
 import Link from 'next/link';
 import { ArrowLeft, Sparkles, Users, BookOpen, Compass } from 'lucide-react';
-import { getCurrentUser } from '@/lib/auth';
+import { getCurrentUser, hasPremiumAccess } from '@/lib/auth';
 import { getBrandSettings } from '@/lib/brand';
 import {
-  listContent,
+  listPublishedContent,
   listFeaturedGuides,
   listPublishedGuides,
   listFeaturedCreators,
@@ -12,10 +12,12 @@ import {
   listPlaylists,
   getPlaylistItemCounts,
 } from '@/lib/learn/db';
-import { isPubliclyListed } from '@/lib/learn/access';
+import { isPubliclyListed, resolveAccessLevel, resolveDisplayPrice } from '@/lib/learn/access';
+import { listOwnedResourceIds } from '@/lib/payments/entitlement-service';
 import { type HomepageSection } from '@/lib/learn/homepage';
 import { getHomepageConfig } from '@/lib/learn/homepage-server';
 import GuideCard from '@/components/learn/GuideCard';
+import CourseLockOverlay from '@/components/learn/CourseLockOverlay';
 import PlaylistCard from '@/components/learn/PlaylistCard';
 import MarketingHeader from '@/components/marketing/MarketingHeader';
 import MarketingFooter from '@/components/marketing/MarketingFooter';
@@ -25,7 +27,7 @@ export const dynamic = 'force-dynamic';
 
 export const metadata = {
   title: 'DigiTech HUB — השכלה פרקטית',
-  description: 'קורסים, מדריכים ופלייבוקים מהיוצרים המובילים בישראל. התחילו ללמוד בחינם.',
+  description: 'קורסים, הדרכות ופלייבוקים מהיוצרים המובילים בישראל. התחילו ללמוד בחינם.',
 };
 
 const VALUE_PROPS = [
@@ -41,16 +43,18 @@ function take<T>(arr: T[], limit?: number | null): T[] {
 }
 
 export default async function HomePage() {
-  const [auth, brand, sections, coursesRaw, featuredGuides, featuredCreators, featuredPlaylists] =
+  const [auth, brand, sections, coursesRaw, featuredGuides, featuredCreators, featuredPlaylists, ownedIds] =
     await Promise.all([
       getCurrentUser(),
       getBrandSettings(),
       getHomepageConfig(),
-      listContent('course'),
+      listPublishedContent('course'),
       listFeaturedGuides(FETCH_CAP),
       listFeaturedCreators(FETCH_CAP),
       listFeaturedPlaylists(FETCH_CAP),
+      listOwnedResourceIds('course'),
     ]);
+  const canSeePremium = auth ? hasPremiumAccess(auth.profile) : false;
 
   const active = sections.filter((s) => s.enabled);
   const needs = (type: HomepageSection['type']) => active.some((s) => s.type === type);
@@ -147,6 +151,12 @@ export default async function HomePage() {
             <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
               {items.map((c) => {
                 const domain = c.domain ? DOMAIN_BY_ID[c.domain] : null;
+                const level = resolveAccessLevel(c);
+                const isPaid = level === 'purchase_required';
+                const dp = isPaid ? resolveDisplayPrice(c) : null;
+                const locked =
+                  !(ownedIds.has(c.id) || canSeePremium) &&
+                  (isPaid || c.is_premium || level === 'subscription_required');
                 return (
                   <Link
                     key={c.id}
@@ -162,9 +172,15 @@ export default async function HomePage() {
                           : { backgroundImage: 'linear-gradient(135deg, #2E1A5C 0%, #4A2E8F 60%, #5B3AAE 100%)' }
                       }
                     >
-                      <span className="absolute top-3 left-3 inline-flex items-center gap-1 px-2 py-0.5 rounded-pill text-[10px] font-bold bg-white/90 text-neutral-700">
+                      <span className="absolute top-3 left-3 z-10 inline-flex items-center gap-1 px-2 py-0.5 rounded-pill text-[10px] font-bold bg-white/90 text-neutral-700">
                         <BookOpen className="w-3 h-3" /> קורס
                       </span>
+                      <CourseLockOverlay
+                        locked={locked}
+                        priceFinal={dp?.final}
+                        priceOriginal={dp?.original}
+                        hasDiscount={dp?.hasDiscount}
+                      />
                     </div>
                     <div className="p-5 flex flex-col flex-1">
                       {domain && <span className="text-[11px] font-bold text-brand-purple-600 mb-1.5">{domain.label}</span>}
@@ -185,7 +201,7 @@ export default async function HomePage() {
         const items = take(guides, s.limit ?? 6);
         if (items.length === 0) return null;
         return (
-          <Section key={s.key} title={s.title || 'מדריכים אחרונים'} href={s.cta_href || '/learn/guides'} cta={s.cta_label || 'כל המדריכים'}>
+          <Section key={s.key} title={s.title || 'הדרכות אחרונות'} href={s.cta_href || '/learn/guides'} cta={s.cta_label || 'כל ההדרכות'}>
             <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
               {items.map((g) => (
                 <GuideCard key={g.id} guide={g} />

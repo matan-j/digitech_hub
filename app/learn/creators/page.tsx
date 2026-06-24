@@ -23,7 +23,7 @@ export default async function CreatorsIndex() {
           <span className="text-[11px] font-extrabold text-brand-purple-700 uppercase tracking-[0.18em]">יוצרים</span>
         </div>
         <h1 className="text-2xl sm:text-3xl font-extrabold text-neutral-950">היוצרים של Digitech</h1>
-        <p className="text-sm text-neutral-700 mt-1.5">הכירו את האנשים שמאחורי התוכן — מדריכים, פלייליסטים וידע פרקטי.</p>
+        <p className="text-sm text-neutral-700 mt-1.5">הכירו את האנשים שמאחורי התוכן — הדרכות, פלייליסטים וידע פרקטי.</p>
       </header>
 
       <CreatorsDirectory creators={cards} />

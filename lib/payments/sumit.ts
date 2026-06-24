@@ -19,23 +19,6 @@
 
 import crypto from 'crypto';
 
-export type SumitCheckoutRequest = {
-  publicOrderId: string;
-  amount: number;
-  currency: string;
-  description: string;
-  customerEmail: string;
-  customerName?: string | null;
-  successUrl: string;
-  failureUrl: string;
-};
-
-export type SumitCheckoutResult = {
-  checkoutUrl: string;
-  providerRef: string | null;
-  mock: boolean;
-};
-
 export type SumitWebhookEvent = {
   providerEventId: string;
   eventType: string;          // e.g. payment.succeeded | payment.failed
@@ -63,36 +46,10 @@ export function generatePublicOrderId(): string {
   return `DGH-${raw}`;
 }
 
-/**
- * Request a hosted checkout URL. In mock mode we return a local mock-checkout
- * page that drives the same webhook. In live mode this calls SUMIT.
- */
-export async function createHostedCheckout(
-  req: SumitCheckoutRequest,
-): Promise<SumitCheckoutResult> {
-  if (!isSumitLive()) {
-    // MOCK: a local page that simulates the SUMIT hosted checkout and posts a
-    // signed mock event to our webhook. No real charge, fully testable.
-    const url = `/payment/mock-checkout?order=${encodeURIComponent(req.publicOrderId)}`;
-    return { checkoutUrl: url, providerRef: null, mock: true };
-  }
-
-  // ---- LIVE (wire to real SUMIT endpoint when credentials are verified) ----
-  // const res = await fetch('https://api.sumit.co.il/billing/payments/charge/', {
-  //   method: 'POST',
-  //   headers: { 'Content-Type': 'application/json' },
-  //   body: JSON.stringify({
-  //     Credentials: { CompanyID: process.env.SUMIT_COMPANY_ID, APIKey: process.env.SUMIT_API_KEY },
-  //     Payment: { Amount: req.amount, Currency: req.currency },
-  //     RedirectURL: req.successUrl,
-  //     ExternalIdentifier: req.publicOrderId,
-  //     Customer: { Name: req.customerName, EmailAddress: req.customerEmail },
-  //   }),
-  // });
-  // const data = await res.json();
-  // return { checkoutUrl: data.Data.RedirectURL, providerRef: data.Data.PaymentID, mock: false };
-  throw new Error('SUMIT live mode requested but live API call is not yet wired. Set SUMIT_LIVE=false to use the mock flow.');
-}
+// NOTE: outbound hosted-checkout (createHostedCheckout) was removed in the V1
+// purchase system — the active paid path is the Make.com lead webhook
+// (see app/api/purchase + lib/payments/make-webhook). The inbound verified-
+// payment helpers below are kept for the FUTURE real-payment grant path.
 
 /**
  * Verify an inbound webhook. Live: HMAC-SHA256 of the raw body with the shared

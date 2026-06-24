@@ -6,7 +6,7 @@ import { LayoutDashboard, User, BookOpen, ListVideo } from 'lucide-react';
 
 const ITEMS = [
   { href: '/learn/creator', label: 'סקירה', icon: LayoutDashboard, exact: true },
-  { href: '/learn/creator/guides', label: 'המדריכים שלי', icon: BookOpen, exact: false },
+  { href: '/learn/creator/guides', label: 'ההדרכות שלי', icon: BookOpen, exact: false },
   { href: '/learn/creator/playlists', label: 'הפלייליסטים שלי', icon: ListVideo, exact: false },
   { href: '/learn/creator/profile', label: 'הפרופיל שלי', icon: User, exact: false },
 ] as const;

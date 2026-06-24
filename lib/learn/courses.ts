@@ -1,6 +1,6 @@
 import 'server-only';
 import type { Course, Lesson } from './types';
-import { getCourseWithLessons, listContent } from './db';
+import { getCourseWithLessons, listPublishedContent } from './db';
 import type { CourseWithLessons, DbLesson, DbResource } from './types';
 
 // ----------------------------------------------------------------
@@ -39,13 +39,14 @@ function mapCourse(c: CourseWithLessons): Course {
     description: c.description ?? '',
     audience: c.audience ?? undefined,
     cover: (c.cover_style as 'hero' | 'header' | undefined) ?? 'hero',
+    coverUrl: c.cover_url ?? null,
     lastUpdated: c.updated_at ? new Intl.DateTimeFormat('he-IL', { dateStyle: 'short' }).format(new Date(c.updated_at)) : undefined,
     lessons: [...c.lessons].sort((a, b) => a.position - b.position).map(mapLesson),
   };
 }
 
 export async function listCourses(): Promise<Course[]> {
-  const items = await listContent('course');
+  const items = await listPublishedContent('course');
   const published = items.filter((c) => c.status === 'published');
   // Lessons are not needed for the index view; show empty arrays
   return published.map((c) => ({
@@ -55,6 +56,7 @@ export async function listCourses(): Promise<Course[]> {
     description: c.description ?? '',
     audience: c.audience ?? undefined,
     cover: c.cover_style,
+    coverUrl: c.cover_url ?? null,
     lastUpdated: c.updated_at ? new Intl.DateTimeFormat('he-IL', { dateStyle: 'short' }).format(new Date(c.updated_at)) : undefined,
     lessons: [],
   }));
@@ -80,5 +82,9 @@ export async function getLesson(courseSlug: string, lessonSlug: string) {
     // Pass through the DB id so we can wire MarkComplete to the API
     lessonId: full.lessons[idx]?.id ?? null,
     isPremium: full.is_premium,
+    // Access model (migration 018/024) — for the purchase_required gate.
+    accessLevel: full.access_level ?? null,
+    courseId: full.id,
+    isPreviewLesson: full.lessons[idx]?.is_preview ?? false,
   };
 }

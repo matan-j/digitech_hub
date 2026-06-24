@@ -9,19 +9,25 @@ import { generatePublicOrderId } from './sumit';
 
 export type ContentType = 'course' | 'guide' | 'playbook' | 'resource' | 'bundle';
 export type OrderStatus = 'pending' | 'paid' | 'failed' | 'cancelled' | 'refunded';
+export type OrderProvider = 'sumit' | 'manual';
+export type RequestWebhookStatus = 'pending' | 'sent' | 'failed';
 
 export type Order = {
   id: string;
   public_order_id: string;
   user_id: string;
-  provider: 'sumit';
+  provider: OrderProvider;
   content_type: ContentType;
   content_id: string;
   amount: number;
+  original_amount: number | null;
   currency: string;
   status: OrderStatus;
   provider_transaction_id: string | null;
   checkout_url: string | null;
+  request_webhook_status: RequestWebhookStatus;
+  request_webhook_sent_at: string | null;
+  request_webhook_error: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -31,7 +37,9 @@ export async function createPendingOrder(params: {
   contentType: ContentType;
   contentId: string;
   amount: number;
+  originalAmount?: number | null;
   currency: string;
+  provider?: OrderProvider;
 }): Promise<Order> {
   const supabase = createServiceClient();
   const { data, error } = await supabase
@@ -39,10 +47,11 @@ export async function createPendingOrder(params: {
     .insert({
       public_order_id: generatePublicOrderId(),
       user_id: params.userId,
-      provider: 'sumit',
+      provider: params.provider ?? 'manual',
       content_type: params.contentType,
       content_id: params.contentId,
       amount: params.amount,
+      original_amount: params.originalAmount ?? params.amount,
       currency: params.currency,
       status: 'pending',
     })
@@ -50,6 +59,42 @@ export async function createPendingOrder(params: {
     .single();
   if (error) throw new Error(`createPendingOrder failed: ${error.message}`);
   return data as Order;
+}
+
+/** The current open (pending) order for this user+item, if any. Used to avoid
+ *  creating duplicate orders / resending the webhook on double-click or refresh. */
+export async function getOpenPendingOrder(
+  userId: string,
+  contentType: ContentType,
+  contentId: string,
+): Promise<Order | null> {
+  const supabase = createServiceClient();
+  const { data } = await supabase
+    .from('orders')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('content_type', contentType)
+    .eq('content_id', contentId)
+    .eq('status', 'pending')
+    .maybeSingle();
+  return (data as Order) ?? null;
+}
+
+/** Record the outbound purchase-request webhook result on the order. */
+export async function markRequestWebhook(
+  orderId: string,
+  status: RequestWebhookStatus,
+  error?: string | null,
+): Promise<void> {
+  const supabase = createServiceClient();
+  await supabase
+    .from('orders')
+    .update({
+      request_webhook_status: status,
+      request_webhook_sent_at: status === 'sent' ? new Date().toISOString() : null,
+      request_webhook_error: error ?? null,
+    })
+    .eq('id', orderId);
 }
 
 export async function setOrderCheckoutUrl(orderId: string, checkoutUrl: string): Promise<void> {

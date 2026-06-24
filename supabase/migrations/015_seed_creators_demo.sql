@@ -12,7 +12,7 @@ values
    'CEO, Digitech & EDDI', true, 10,
    'https://digi-tech.co.il', 'https://youtube.com/@matanjacobson', 'https://instagram.com/', 'https://linkedin.com/'),
   ('digitech', 'Digitech',
-   'בית התוכן של Digitech — מדריכים פרקטיים, קורסים וכלים ללמידה עצמאית.',
+   'בית התוכן של Digitech — הדרכות פרקטיות, קורסים וכלים ללמידה עצמאית.',
    'Digitech Learning Hub', true, 20,
    'https://digi-tech.co.il', 'https://youtube.com/', null, null)
 on conflict (slug) do nothing;
@@ -51,7 +51,7 @@ insert into public.content_items
    content_kind, content_url, video_url, body, creator_id, published_at)
 select 'guide', 'claude-design-getting-started', 'Claude Design – Getting Started',
        'מתחילים לעצב עם Claude — צעד אחר צעד.',
-       'מדריך וידאו קצר שמראה איך להתחיל לעצב ממשקים בעזרת Claude.',
+       'הדרכת וידאו קצרה שמראה איך להתחיל לעצב ממשקים בעזרת Claude.',
        'published', false, true, 'design',
        'youtube', 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
        '[]'::jsonb, c.id, now()

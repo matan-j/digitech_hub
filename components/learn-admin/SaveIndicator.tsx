@@ -18,16 +18,33 @@ export default function SaveIndicator({
   onForceSave?: () => void;
 }) {
   const c = COPY[state];
-  const clickable = state === 'error' || state === 'dirty';
+  const canSave = onForceSave && (state === 'dirty' || state === 'error');
+
+  if (!onForceSave) {
+    return (
+      <span className={`text-xs font-medium px-2.5 py-1.5 rounded-full ${c.cls}`}>
+        {c.text}
+      </span>
+    );
+  }
+
   return (
-    <button
-      type="button"
-      onClick={clickable ? onForceSave : undefined}
-      disabled={!clickable}
-      className={`text-xs font-medium px-2.5 py-1.5 rounded-full ${c.cls} ${clickable ? 'cursor-pointer hover:opacity-80' : 'cursor-default'}`}
-      title={clickable ? 'לחיצה תנסה שוב' : ''}
-    >
-      {c.text}
-    </button>
+    <div className="flex items-center gap-2">
+      <span className={`text-xs font-medium px-2.5 py-1.5 rounded-full ${c.cls}`}>
+        {c.text}
+      </span>
+      <button
+        type="button"
+        onClick={canSave ? onForceSave : undefined}
+        disabled={!canSave}
+        className={`text-xs font-semibold px-3 py-1.5 rounded-full transition-colors ${
+          canSave
+            ? 'bg-brand-purple-700 text-white hover:bg-brand-purple-600 cursor-pointer'
+            : 'bg-neutral-100 text-neutral-400 cursor-default'
+        }`}
+      >
+        {state === 'saving' ? 'שומר…' : 'שמור'}
+      </button>
+    </div>
   );
 }

@@ -21,7 +21,7 @@ export const metadata: Metadata = {
     default: 'DigiTech HUB · השכלה פרקטית',
     template: '%s · DigiTech HUB',
   },
-  description: 'מועדון הלמידה של Digitech — קורסים, מדריכים ופלייבוקים ב-AI ובדיגיטל',
+  description: 'מועדון הלמידה של Digitech — קורסים, הדרכות ופלייבוקים ב-AI ובדיגיטל',
 };
 
 export default function RootLayout({

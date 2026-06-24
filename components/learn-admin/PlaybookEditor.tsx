@@ -97,6 +97,11 @@ export default function PlaybookEditor({ initial }: Props) {
     if (saveTimer.current) clearTimeout(saveTimer.current);
   }, []);
 
+  const saveNow = useCallback(() => {
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    void persist(buildPayload());
+  }, [persist]);
+
   async function togglePublish() {
     const next = status === 'published' ? 'draft' : 'published';
     const ok = await persist(buildPayload({ status: next }));
@@ -130,7 +135,7 @@ export default function PlaybookEditor({ initial }: Props) {
             />
           </div>
           <div className="flex flex-col items-end gap-2">
-            <SaveIndicator state={saveState} />
+            <SaveIndicator state={saveState} onForceSave={saveNow} />
             <a
               href={publicUrl}
               target="_blank"
