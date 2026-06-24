@@ -11,7 +11,25 @@ type State = 'idle' | 'loading' | 'success' | 'error';
  * available, falling back to copy-to-clipboard. Mirrors the share/copy pattern in
  * CreatorProfileView, but the URL handed out is always the shortened one.
  */
-export default function ShareButton({ path, title }: { path: string; title?: string }) {
+type Variant = 'overlay' | 'inline';
+
+// `overlay` (default): white/blur pill for placing over dark cover images.
+// `inline`: purple-tinted pill that stays visible on light/white backgrounds
+// (e.g. a guide's meta row).
+const VARIANT_CLASSES: Record<Variant, string> = {
+  overlay: 'bg-white/90 backdrop-blur-sm text-brand-purple-700 shadow-sm hover:bg-white hover:text-brand-purple-500',
+  inline: 'bg-brand-purple-50 text-brand-purple-700 hover:bg-brand-purple-100',
+};
+
+export default function ShareButton({
+  path,
+  title,
+  variant = 'overlay',
+}: {
+  path: string;
+  title?: string;
+  variant?: Variant;
+}) {
   const [state, setState] = useState<State>('idle');
 
   async function getShortUrl(): Promise<string> {
@@ -63,7 +81,7 @@ export default function ShareButton({ path, title }: { path: string; title?: str
 
   const Icon = state === 'loading' ? Loader2 : state === 'success' ? Check : Share2;
   const label =
-    state === 'success' ? 'הקישור הועתק' : state === 'error' ? 'שגיאה — נסו שוב' : 'שתף קורס';
+    state === 'success' ? 'הקישור הועתק' : state === 'error' ? 'שגיאה — נסו שוב' : 'שתף';
 
   return (
     <button
@@ -72,7 +90,7 @@ export default function ShareButton({ path, title }: { path: string; title?: str
       disabled={state === 'loading'}
       aria-label={label}
       title={label}
-      className="inline-flex items-center justify-center w-8 h-8 rounded-pill bg-white/90 backdrop-blur-sm text-brand-purple-700 shadow-sm hover:bg-white hover:text-brand-purple-500 disabled:opacity-60 transition-colors"
+      className={`inline-flex items-center justify-center w-8 h-8 rounded-pill disabled:opacity-60 transition-colors ${VARIANT_CLASSES[variant]}`}
     >
       <Icon
         className={`w-4 h-4 ${state === 'loading' ? 'animate-spin' : ''} ${

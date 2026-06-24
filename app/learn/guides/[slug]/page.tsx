@@ -20,6 +20,7 @@ import { parseVimeoInput } from '@/lib/learn/vimeo';
 import { contentKindLabel } from '@/lib/learn/placeholder';
 import { decideAccess, gateCtaLabel, formatPrice, type GateReason } from '@/lib/learn/access';
 import AccessActionButton from '@/components/learn/AccessActionButton';
+import ShareButton from '@/components/learn/ShareButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -143,6 +144,9 @@ export default async function GuideReadPage({ params }: { params: Promise<{ slug
               {guide.duration_minutes} דקות
             </span>
           ) : null}
+          <span className="ms-auto">
+            <ShareButton path={`/learn/guides/${slug}`} title={guide.title} variant="inline" />
+          </span>
         </div>
 
         <h1 className="text-3xl lg:text-4xl font-extrabold text-neutral-950 mb-3 leading-tight">{guide.title}</h1>
