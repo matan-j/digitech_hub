@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { resolveFinalPrice } from '@/lib/payments/pricing';
 import {
   createPendingOrder,
@@ -39,16 +39,23 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'invalid_request' }, { status: 400 });
   }
 
-  const supabase = await createClient();
-  const { data: item } = await supabase
+  // Read the course via the service client: a purchase_required row is hidden by
+  // RLS (migration 022) from a user who doesn't own it yet — exactly the buyer.
+  // This is server-trusted pricing metadata; the price is still recomputed here,
+  // never taken from the client.
+  const service = createServiceClient();
+  const { data: item } = await service
     .from('content_items')
     .select('id, slug, title, access_level, is_premium, price_amount, sale_amount, price_currency, status')
     .eq('slug', slug)
     .eq('type', contentType)
     .maybeSingle();
   if (!item || item.status !== 'published') {
+    console.error('[purchase] course not found / unpublished', { slug, contentType, found: !!item, status: item?.status });
     return NextResponse.json({ error: 'not_found' }, { status: 404 });
   }
+
+  const supabase = await createClient();
 
   const level = resolveAccessLevel(item);
   const price = resolveFinalPrice(item);
