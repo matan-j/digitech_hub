@@ -41,6 +41,7 @@ const BASE_FIELDS = [
   'access_level',
   'preview_enabled',
   'price_amount',
+  'sale_amount',
   'price_currency',
 ] as const;
 

@@ -4,7 +4,7 @@ import { ArrowLeft, ArrowRight, Clock, Lock, Play, Check, Folder, BookOpen } fro
 import { getCourseWithModules, getCompletedLessonIds } from '@/lib/learn/db';
 import { getCurrentUser, hasPremiumAccess } from '@/lib/auth';
 import { renderMarkdownLite } from '@/lib/learn/markdown';
-import { decideAccess, resolveAccessLevel, formatPrice } from '@/lib/learn/access';
+import { decideAccess, resolveAccessLevel, resolveDisplayPrice } from '@/lib/learn/access';
 import { hasActiveEntitlement } from '@/lib/payments/entitlement-service';
 import AccessActionButton from '@/components/learn/AccessActionButton';
 import type { DbLesson, ModuleWithChildren } from '@/lib/learn/types';
@@ -14,7 +14,9 @@ export const dynamic = 'force-dynamic';
 
 export async function generateMetadata({ params }: { params: Promise<{ course: string }> }) {
   const { course: slug } = await params;
-  const c = await getCourseWithModules(slug);
+  // Base read for those with access; public-view fallback so a guest on a
+  // premium/paid course still gets the real title (not "קורס לא נמצא").
+  const c = (await getCourseWithModules(slug)) ?? (await getCourseWithModules(slug, { source: 'public' }));
   return { title: c ? `${c.title} — Digitech Learning Hub` : 'קורס לא נמצא' };
 }
 
@@ -30,7 +32,12 @@ function flattenLessons(modules: ModuleWithChildren[]): DbLesson[] {
 
 export default async function CourseLanding({ params }: { params: Promise<{ course: string }> }) {
   const { course: slug } = await params;
-  const course = await getCourseWithModules(slug);
+  // Try the gated base tables first (full content for admin / entitled / free /
+  // logged-in viewers). If RLS hides the row — a guest or non-entitled viewer on
+  // a premium/paid course — fall back to the public metadata views so the course
+  // still renders, locked, with its lesson list and purchase/subscribe CTA.
+  const course =
+    (await getCourseWithModules(slug)) ?? (await getCourseWithModules(slug, { source: 'public' }));
   if (!course || course.status !== 'published') notFound();
 
   const auth = await getCurrentUser();
@@ -131,18 +138,27 @@ export default async function CourseLanding({ params }: { params: Promise<{ cour
                   );
                 }
                 if (level === 'purchase_required') {
-                  const price = formatPrice(course.price_amount, course.price_currency);
+                  const dp = resolveDisplayPrice(course);
                   return (
-                    <AccessActionButton
-                      kind="purchase"
-                      slug={slug}
-                      contentType="course"
-                      returnTo={returnTo}
-                      label={price ? `רכישת גישה · ${price}` : 'רכישת גישה לקורס'}
-                      className={btnCls}
-                      errorClassName={errCls}
-                      icon={<Lock className="w-4 h-4" />}
-                    />
+                    <div className="flex flex-col items-start gap-2">
+                      {dp.hasDiscount && dp.original && (
+                        <span className="text-sm text-brand-purple-200">
+                          <span className="line-through opacity-70">{dp.original}</span>
+                          <span className="ms-2 font-extrabold text-white">{dp.final}</span>
+                          <span className="ms-2 text-[11px] font-bold uppercase tracking-wide text-emerald-300">מבצע</span>
+                        </span>
+                      )}
+                      <AccessActionButton
+                        kind="purchase"
+                        slug={slug}
+                        contentType="course"
+                        returnTo={returnTo}
+                        label={dp.final ? `רכישה מיידית · ${dp.final}` : 'רכישת גישה לקורס'}
+                        className={btnCls}
+                        errorClassName={errCls}
+                        icon={<Lock className="w-4 h-4" />}
+                      />
+                    </div>
                   );
                 }
                 if (level === 'subscription_required') {

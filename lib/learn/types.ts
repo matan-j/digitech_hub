@@ -81,6 +81,8 @@ export type DbLesson = {
   duration: string | null;
   body: string | null;
   position: number;
+  /** Free preview lesson inside an otherwise gated course (migration 018). */
+  is_preview?: boolean;
   resources?: DbResource[];
 };
 
@@ -147,6 +149,8 @@ export type ContentItem = {
   preview_enabled: boolean;
   /** Price in price_currency for purchase_required items (null = not for sale). */
   price_amount: number | null;
+  /** Discounted price (migration 024). When set & below price_amount it is the final price. */
+  sale_amount: number | null;
   price_currency: string;
   body: GuideBlock[] | null;
   created_by: string | null;

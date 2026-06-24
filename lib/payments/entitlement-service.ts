@@ -17,7 +17,8 @@ export async function grantEntitlement(params: {
   userId: string;
   resourceType: ResourceType;
   resourceId: string;
-  orderId: string;
+  /** Omit for free grants and manual admin grants (no order). */
+  orderId?: string | null;
   source?: 'purchase' | 'admin' | 'gift';
   expiresAt?: string | null;
 }): Promise<void> {
@@ -29,7 +30,7 @@ export async function grantEntitlement(params: {
         user_id: params.userId,
         resource_type: params.resourceType,
         resource_id: params.resourceId,
-        order_id: params.orderId,
+        order_id: params.orderId ?? null,
         source: params.source ?? 'purchase',
         status: 'active',
         granted_at: new Date().toISOString(),

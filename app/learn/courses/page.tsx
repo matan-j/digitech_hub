@@ -1,15 +1,18 @@
 import Link from 'next/link';
-import { listContent, progressByCourse } from '@/lib/learn/db';
+import { listPublishedContent, progressByCourse } from '@/lib/learn/db';
 import { getCurrentUser, hasPremiumAccess } from '@/lib/auth';
 import { ArrowLeft, Lock, BookOpen } from 'lucide-react';
 import ShareButton from '@/components/learn/ShareButton';
+import { resolveAccessLevel, resolveDisplayPrice, isPubliclyListed } from '@/lib/learn/access';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'קורסים · DigiTech HUB' };
 
 export default async function CoursesIndexPage() {
-  const [items, auth] = await Promise.all([listContent('course'), getCurrentUser()]);
-  const visible = items.filter((c) => c.status === 'published');
+  // Public catalog: read metadata from the public view so guests also see
+  // premium/paid published courses (shown locked). Unlisted items stay hidden.
+  const [items, auth] = await Promise.all([listPublishedContent('course'), getCurrentUser()]);
+  const visible = items.filter(isPubliclyListed);
   const canSeePremium = auth ? hasPremiumAccess(auth.profile) : false;
   const progress = auth ? await progressByCourse(auth.userId) : {};
 
@@ -36,7 +39,12 @@ export default async function CoursesIndexPage() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {visible.map((c) => {
-            const locked = c.is_premium && !canSeePremium;
+            const level = resolveAccessLevel(c);
+            const isPaid = level === 'purchase_required';
+            const dp = isPaid ? resolveDisplayPrice(c) : null;
+            // Paid courses always show their gate on the card (true access is
+            // resolved on the landing page). Legacy premium stays subscription-gated.
+            const locked = isPaid || (c.is_premium && !canSeePremium);
             const cp = progress[c.id];
             const pct = cp && cp.total > 0 ? Math.round((cp.done / cp.total) * 100) : 0;
             return (
@@ -80,7 +88,7 @@ export default async function CoursesIndexPage() {
                   {locked && (
                     <div className="absolute top-3 right-3 bg-white rounded-pill px-2 py-1 flex items-center gap-1 text-[10px] font-bold text-brand-purple-700">
                       <Lock className="w-3 h-3" />
-                      פרימיום
+                      {isPaid && dp?.final ? dp.final : 'פרימיום'}
                     </div>
                   )}
                 </div>
@@ -108,7 +116,7 @@ export default async function CoursesIndexPage() {
                   )}
                   <div className="flex items-center justify-end">
                     <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-brand-purple-700 group-hover:text-brand-purple-500 transition-colors">
-                      {locked ? 'הצטרף' : pct > 0 ? 'המשך' : 'התחל'}
+                      {isPaid ? (dp?.final ? `רכישה · ${dp.final}` : 'רכישה') : locked ? 'הצטרף' : pct > 0 ? 'המשך' : 'התחל'}
                       <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-0.5" />
                     </span>
                   </div>

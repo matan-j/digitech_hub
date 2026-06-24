@@ -76,6 +76,26 @@ export async function listContent(type: ContentType): Promise<ContentItem[]> {
   return await attachContentCategories(supabase, rows);
 }
 
+/**
+ * Public discovery listing — reads PUBLISHED-item metadata from the
+ * `content_items_public` view (migration 022/024/026) instead of the RLS-gated
+ * base table. This is what lets anonymous visitors see premium/paid courses in
+ * the catalog (shown locked); the body/video stays gated in the base tables.
+ * Use this on public (non-admin) pages; admin listings keep using listContent.
+ */
+export async function listPublishedContent(type: ContentType): Promise<ContentItem[]> {
+  const supabase = await db();
+  const { data, error } = await supabase
+    .from('content_items_public')
+    .select('*')
+    .eq('type', type)
+    .order('published_at', { ascending: false, nullsFirst: false })
+    .order('updated_at', { ascending: false });
+  if (error) throw error;
+  const rows = (data ?? []) as ContentItem[];
+  return await attachContentCategories(supabase, rows);
+}
+
 export async function getContentBySlug(type: ContentType, slug: string): Promise<ContentItem | null> {
   const supabase = await db();
   const { data, error } = await supabase
@@ -103,10 +123,24 @@ export async function getContentById(id: string): Promise<ContentItem | null> {
 
 // ----- Courses (with modules → chapters → lessons hierarchy) -----
 
-export async function getCourseWithModules(slug: string): Promise<CourseWithModules | null> {
+export async function getCourseWithModules(
+  slug: string,
+  opts: { source?: 'base' | 'public' } = {},
+): Promise<CourseWithModules | null> {
   const supabase = await db();
+  // `public` reads metadata from the RLS-bypassing *_public views (no bodies),
+  // so a guest can render a locked course landing for a premium/paid course.
+  // `base` (default) reads the gated tables — full content for those with access
+  // and for admin tooling.
+  const isPublic = opts.source === 'public';
+  const T = {
+    content: isPublic ? 'content_items_public' : 'content_items',
+    modules: isPublic ? 'modules_public' : 'modules',
+    chapters: isPublic ? 'chapters_public' : 'chapters',
+    lessons: isPublic ? 'lessons_public' : 'lessons',
+  } as const;
   const { data: course, error: cErr } = await supabase
-    .from('content_items')
+    .from(T.content)
     .select('*')
     .eq('type', 'course')
     .eq('slug', slug)
@@ -117,12 +151,12 @@ export async function getCourseWithModules(slug: string): Promise<CourseWithModu
   // Fetch modules + lessons in parallel; chapters depend on module ids
   const [modulesRes, lessonsRes] = await Promise.all([
     supabase
-      .from('modules')
+      .from(T.modules)
       .select('*')
       .eq('course_id', course.id)
       .order('position', { ascending: true }),
     supabase
-      .from('lessons')
+      .from(T.lessons)
       .select('*')
       .eq('course_id', course.id)
       .order('position', { ascending: true }),
@@ -138,7 +172,7 @@ export async function getCourseWithModules(slug: string): Promise<CourseWithModu
   const [chaptersRes, resourcesRes] = await Promise.all([
     moduleIds.length
       ? supabase
-          .from('chapters')
+          .from(T.chapters)
           .select('*')
           .in('module_id', moduleIds)
           .order('position', { ascending: true })

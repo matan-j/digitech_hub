@@ -3,7 +3,7 @@ import { ArrowLeft, Sparkles, Users, BookOpen, Compass } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth';
 import { getBrandSettings } from '@/lib/brand';
 import {
-  listContent,
+  listPublishedContent,
   listFeaturedGuides,
   listPublishedGuides,
   listFeaturedCreators,
@@ -46,7 +46,7 @@ export default async function HomePage() {
       getCurrentUser(),
       getBrandSettings(),
       getHomepageConfig(),
-      listContent('course'),
+      listPublishedContent('course'),
       listFeaturedGuides(FETCH_CAP),
       listFeaturedCreators(FETCH_CAP),
       listFeaturedPlaylists(FETCH_CAP),

@@ -8,6 +8,8 @@
 // once the migrations are applied.
 // ============================================================
 
+import { resolveFinalPrice } from '@/lib/payments/pricing';
+
 export type AccessLevel =
   | 'open'
   | 'login_required'
@@ -24,6 +26,9 @@ export type AccessFields = {
   access_level?: AccessLevel | null;
   catalog_visibility?: CatalogVisibility | null;
   preview_enabled?: boolean | null;
+  price_amount?: number | null;
+  sale_amount?: number | null;
+  price_currency?: string | null;
 };
 
 /** Effective access level — new column wins; legacy is_premium is the fallback. */
@@ -93,6 +98,26 @@ export function formatPrice(amount: number | null | undefined, currency: string 
   if (!amount || amount <= 0) return null;
   const sym = currency === 'USD' ? '$' : currency === 'EUR' ? '€' : '₪';
   return `${sym}${amount % 1 === 0 ? amount : amount.toFixed(2)}`;
+}
+
+/**
+ * Display-ready pricing for a card/landing CTA. Mirrors the server's
+ * resolveFinalPrice (lib/payments/pricing.ts) so UI and API agree, and returns
+ * pre-formatted strings. `final`/`original` are null when there's no price.
+ */
+export function resolveDisplayPrice(item: AccessFields): {
+  final: string | null;
+  original: string | null;
+  hasDiscount: boolean;
+  isFree: boolean;
+} {
+  const price = resolveFinalPrice(item);
+  return {
+    final: formatPrice(price.final, price.currency),
+    original: formatPrice(price.original, price.currency),
+    hasDiscount: price.hasDiscount,
+    isFree: price.isFree,
+  };
 }
 
 /** Hebrew CTA label for a gate reason. */
