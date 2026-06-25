@@ -157,21 +157,37 @@ export default function MiniCart() {
                   />
                   <div className="min-w-0 flex-1">
                     <p className="line-clamp-2 text-sm font-bold text-neutral-900">{it.title}</p>
-                    <div className="mt-1 flex items-center gap-2">
-                      <span className="text-sm font-extrabold text-brand-purple-700">
-                        {shekel(it.price_after)}
-                      </span>
-                      {it.hasDiscount && (
-                        <>
-                          <span className="text-xs text-neutral-400 line-through">
-                            {shekel(it.price_before)}
+                    {(() => {
+                      const lineCoupon = it.coupon_discount ?? 0;
+                      const lineFinal = Math.max(0, it.price_after - lineCoupon);
+                      return (
+                        <div className="mt-1 flex flex-wrap items-center gap-2">
+                          <span className="text-sm font-extrabold text-brand-purple-700">
+                            {shekel(lineFinal)}
                           </span>
-                          <span className="rounded-pill bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700">
-                            חיסכון {shekel(it.price_before - it.price_after)}
-                          </span>
-                        </>
-                      )}
-                    </div>
+                          {lineCoupon > 0 ? (
+                            <>
+                              <span className="text-xs text-neutral-400 line-through">
+                                {shekel(it.price_after)}
+                              </span>
+                              <span className="inline-flex items-center gap-1 rounded-pill bg-brand-purple-100 px-1.5 py-0.5 text-[10px] font-bold text-brand-purple-700">
+                                <Tag className="h-2.5 w-2.5" />
+                                קופון −{shekel(lineCoupon)}
+                              </span>
+                            </>
+                          ) : it.hasDiscount ? (
+                            <>
+                              <span className="text-xs text-neutral-400 line-through">
+                                {shekel(it.price_before)}
+                              </span>
+                              <span className="rounded-pill bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700">
+                                חיסכון {shekel(it.price_before - it.price_after)}
+                              </span>
+                            </>
+                          ) : null}
+                        </div>
+                      );
+                    })()}
                   </div>
                   <button
                     type="button"

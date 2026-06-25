@@ -34,9 +34,11 @@ export type CartLine = {
   cover_square_url: string | null;
   /** List price before discount. */
   price_before: number;
-  /** Server-trusted price the customer pays for this line. */
+  /** Server-trusted price the customer pays for this line (after any sale). */
   price_after: number;
   hasDiscount: boolean;
+  /** Coupon discount applied to THIS line (a 'specific' coupon); 0 otherwise. */
+  coupon_discount: number;
   currency: string;
   added_at: string;
 };
@@ -122,6 +124,7 @@ export async function getCart(userId: string): Promise<CartSummary> {
       price_before: price.original,
       price_after: price.final,
       hasDiscount: price.hasDiscount,
+      coupon_discount: 0,
       currency: price.currency,
       added_at: row.added_at,
     });
@@ -145,6 +148,11 @@ export async function getCart(userId: string): Promise<CartSummary> {
     if (res.ok) {
       coupon = { code: res.code, discount: res.discount, applies_to: res.applies_to };
       total_after_coupon = res.total_after_coupon;
+      // Surface a 'specific' coupon's discount on the matching cart rows.
+      for (const it of items) {
+        const d = res.line_discounts[it.content_id];
+        if (d) it.coupon_discount = d;
+      }
     } else {
       await clearCartCoupon(userId);
     }

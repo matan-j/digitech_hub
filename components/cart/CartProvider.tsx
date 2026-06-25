@@ -20,6 +20,7 @@ export type CartLine = {
   price_before: number;
   price_after: number;
   hasDiscount: boolean;
+  coupon_discount: number;
   currency: string;
   added_at: string;
 };

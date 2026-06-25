@@ -58,6 +58,11 @@ export type CouponApplication = {
   discount: number;
   /** Cart total after the coupon (floored at 0). */
   total_after_coupon: number;
+  /**
+   * Per-line discount for a 'specific' coupon (content_id → ILS off that line).
+   * Empty for an 'all' coupon, whose discount is cart-wide (shown in the summary).
+   */
+  line_discounts: Record<string, number>;
 };
 
 export type CouponResult =
@@ -123,26 +128,49 @@ export async function validateCoupon(
 
   if (lines.length === 0) return { ok: false, reason: 'empty_cart' };
 
-  // Discount base: whole cart, or only the linked products.
-  let base: number;
+  const value = Number(coupon.discount_value);
+  const lineDiscounts: Record<string, number> = {};
+  let discount: number;
+
   if (coupon.applies_to === 'specific') {
+    // Only the linked products get a discount — and it shows on each of their
+    // cart rows (line_discounts), not just the cart total.
     const { data: prods } = await supabase
       .from('coupon_products')
       .select('content_id')
       .eq('coupon_id', coupon.id);
     const allowedIds = new Set((prods ?? []).map((p) => p.content_id as string));
-    const matching = lines.filter((l) => allowedIds.has(l.content_id));
+    const matching = lines.filter((l) => allowedIds.has(l.content_id) && l.price_after > 0);
     if (matching.length === 0) return { ok: false, reason: 'no_matching_items' };
-    base = matching.reduce((s, l) => s + l.price_after, 0);
-  } else {
-    base = lines.reduce((s, l) => s + l.price_after, 0);
-  }
-  if (base <= 0) return { ok: false, reason: 'nothing_to_discount' };
+    const base = matching.reduce((s, l) => s + l.price_after, 0);
+    if (base <= 0) return { ok: false, reason: 'nothing_to_discount' };
 
-  const value = Number(coupon.discount_value);
-  let discount =
-    coupon.discount_type === 'percentage' ? (base * value) / 100 : Math.min(value, base);
-  discount = round2(discount);
+    if (coupon.discount_type === 'percentage') {
+      for (const l of matching) {
+        const d = Math.min(l.price_after, round2((l.price_after * value) / 100));
+        if (d > 0) lineDiscounts[l.content_id] = d;
+      }
+    } else {
+      // Fixed amount spread proportionally across the matching lines (capped per
+      // line at its own price). The last line absorbs the rounding remainder.
+      const totalFixed = Math.min(value, base);
+      let allocated = 0;
+      matching.forEach((l, idx) => {
+        const raw = idx === matching.length - 1
+          ? round2(totalFixed - allocated)
+          : round2((totalFixed * l.price_after) / base);
+        const d = Math.max(0, Math.min(raw, l.price_after));
+        if (d > 0) lineDiscounts[l.content_id] = d;
+        allocated = round2(allocated + d);
+      });
+    }
+    discount = round2(Object.values(lineDiscounts).reduce((s, d) => s + d, 0));
+  } else {
+    const base = lines.reduce((s, l) => s + l.price_after, 0);
+    if (base <= 0) return { ok: false, reason: 'nothing_to_discount' };
+    discount = round2(coupon.discount_type === 'percentage' ? (base * value) / 100 : Math.min(value, base));
+  }
+
   if (discount <= 0) return { ok: false, reason: 'nothing_to_discount' };
 
   const cartTotal = lines.reduce((s, l) => s + l.price_after, 0);
@@ -157,6 +185,7 @@ export async function validateCoupon(
     applies_to: coupon.applies_to,
     discount,
     total_after_coupon,
+    line_discounts: lineDiscounts,
   };
 }
 
