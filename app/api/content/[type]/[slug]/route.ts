@@ -22,6 +22,7 @@ const BASE_FIELDS = [
   'tagline',
   'description',
   'cover_url',
+  'cover_square_url',
   'cover_style',
   'audience',
   'tags',

@@ -147,6 +147,8 @@ export type ContentItem = {
   tagline: string | null;
   description: string | null;
   cover_url: string | null;
+  /** Pre-cropped 1:1 cover for the purchase webhook (migration 035). */
+  cover_square_url: string | null;
   cover_style: 'hero' | 'header';
   audience: string | null;
   tags: string[];

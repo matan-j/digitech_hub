@@ -24,6 +24,8 @@ export type CartLine = {
   slug: string;
   title: string;
   cover_url: string | null;
+  /** Pre-cropped 1:1 cover for the purchase webhook (may be null until generated). */
+  cover_square_url: string | null;
   /** List price before discount. */
   price_before: number;
   /** Server-trusted price the customer pays for this line. */
@@ -66,7 +68,7 @@ export async function getCart(userId: string): Promise<CartSummary> {
   const ids = cart.map((r) => r.content_id);
   const { data: contentRows } = await supabase
     .from('content_items')
-    .select('id, slug, title, cover_url, price_amount, sale_amount, price_currency, status')
+    .select('id, slug, title, cover_url, cover_square_url, price_amount, sale_amount, price_currency, status')
     .in('id', ids);
 
   const byId = new Map(
@@ -88,6 +90,7 @@ export async function getCart(userId: string): Promise<CartSummary> {
       slug: c.slug as string,
       title: (c.title as string) ?? (c.slug as string),
       cover_url: (c.cover_url as string | null) ?? null,
+      cover_square_url: (c.cover_square_url as string | null) ?? null,
       price_before: price.original,
       price_after: price.final,
       hasDiscount: price.hasDiscount,
