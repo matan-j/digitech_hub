@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useSlugSuggestion } from '@/lib/hooks/useSlugSuggestion';
 
 // Product types creatable from this page. Only 'bundle' for now — more types
 // (e.g. live workshop, resource pack) will be added here later.
@@ -12,9 +13,16 @@ export default function NewProductForm() {
   const [productType, setProductType] = useState<(typeof PRODUCT_TYPES)[number]['value']>('bundle');
   const [title, setTitle] = useState('');
   const [slug, setSlug] = useState('');
+  const [slugTouched, setSlugTouched] = useState(false);
   const [tagline, setTagline] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Auto-translate the title to a slug until the admin edits the slug by hand.
+  const { suggestion, loading: slugLoading } = useSlugSuggestion(title, productType, { enabled: !slugTouched });
+  useEffect(() => {
+    if (!slugTouched) setSlug(suggestion);
+  }, [suggestion, slugTouched]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -65,11 +73,13 @@ export default function NewProductForm() {
       <div>
         <label className="block text-sm font-semibold text-neutral-800 mb-1.5">
           Slug
-          <span className="text-xs font-normal text-neutral-500 ms-2">אם ריק — נוצר אוטומטית</span>
+          <span className="text-xs font-normal text-neutral-500 ms-2">
+            {slugLoading ? 'מתרגם את הכותרת…' : 'מתורגם אוטומטית מהכותרת — ניתן לעריכה'}
+          </span>
         </label>
         <input
           value={slug}
-          onChange={(e) => setSlug(e.target.value)}
+          onChange={(e) => { setSlug(e.target.value); setSlugTouched(true); }}
           placeholder="ai-bundle"
           dir="ltr"
           className="w-full px-3 py-2 rounded-md border border-neutral-300 focus:border-brand-purple-500 focus:outline-none text-sm font-mono"
