@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
-import { grantEntitlement, revokeEntitlement, type ResourceType } from '@/lib/payments/entitlement-service';
+import { grantPurchaseAccess, revokeEntitlement, type ResourceType } from '@/lib/payments/entitlement-service';
 
 export const runtime = 'nodejs';
 
@@ -88,7 +88,12 @@ export async function POST(request: Request) {
   if (!userId || !resourceId || !RESOURCE_TYPES.includes(resourceType)) {
     return NextResponse.json({ error: 'invalid_request' }, { status: 400 });
   }
-  await grantEntitlement({ userId, resourceType, resourceId, source: 'admin' });
+  // grantPurchaseAccess (not grantEntitlement): assigning a 'bundle' must expand
+  // into a 'course' entitlement per included course, or the assignee holds only
+  // the bundle row and every course access check (has_entitlement('course', …))
+  // still denies them → they get bounced off the lesson page. For a plain
+  // course/guide this behaves exactly like grantEntitlement.
+  await grantPurchaseAccess({ userId, resourceType, resourceId, source: 'admin' });
   return NextResponse.json({ ok: true });
 }
 

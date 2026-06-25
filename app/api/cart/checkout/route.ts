@@ -25,7 +25,7 @@ import { getCurrentUser } from '@/lib/auth';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { getCart, clearCartItems } from '@/lib/cart/cart-service';
 import { clearCartCoupon, recordRedemption } from '@/lib/payments/coupon-service';
-import { grantEntitlement } from '@/lib/payments/entitlement-service';
+import { grantPurchaseAccess } from '@/lib/payments/entitlement-service';
 import {
   createPendingOrder,
   createOrderItems,
@@ -146,7 +146,10 @@ export async function POST(request: Request) {
     );
     await markOrderPaid(order.id, `free-${order.public_order_id}`);
     for (const i of cart.items) {
-      await grantEntitlement({
+      // grantPurchaseAccess expands a 'bundle' line into a 'course' entitlement
+      // per included course (migration 036); a plain course/guide behaves like
+      // grantEntitlement. Without this a free bundle checkout unlocks nothing.
+      await grantPurchaseAccess({
         userId: auth.userId,
         resourceType: i.content_type,
         resourceId: i.content_id,
