@@ -115,12 +115,21 @@ export async function getContentBySlug(type: ContentType, slug: string): Promise
 /**
  * A bundle (type='bundle' content item) plus its contained courses, in bundle
  * order (bundle_items.position). Returns null if the slug isn't a bundle.
- * Admin-side read (RLS-aware client) — used by the products editor.
+ *
+ * `base` (default) reads the RLS-gated table — admin editor + entitled viewers.
+ * `public` reads content_items_public so a guest / non-buyer can still render
+ * the bundle landing (a purchase_required bundle row is hidden by RLS in base).
+ * bundle_items has a public-read policy (migration 036), so the course list
+ * resolves either way.
  */
-export async function getBundleWithCourses(slug: string): Promise<BundleWithCourses | null> {
+export async function getBundleWithCourses(
+  slug: string,
+  opts: { source?: 'base' | 'public' } = {},
+): Promise<BundleWithCourses | null> {
   const supabase = await db();
+  const table = opts.source === 'public' ? 'content_items_public' : 'content_items';
   const { data: bundle, error } = await supabase
-    .from('content_items')
+    .from(table)
     .select('*')
     .eq('type', 'bundle')
     .eq('slug', slug)
@@ -139,7 +148,7 @@ export async function getBundleWithCourses(slug: string): Promise<BundleWithCour
   let courses: BundleCourseRef[] = [];
   if (courseIds.length > 0) {
     const { data: cs } = await supabase
-      .from('content_items')
+      .from(table)
       .select('id, slug, title, cover_url, price_amount, sale_amount, price_currency, status')
       .in('id', courseIds);
     const byId = new Map((cs ?? []).map((c) => [(c as BundleCourseRef).id, c as BundleCourseRef]));

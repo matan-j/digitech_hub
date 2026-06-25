@@ -13,8 +13,9 @@ import type { ContentType } from '@/lib/payments/order-service';
 
 export const runtime = 'nodejs';
 
-// Only courses can be added to the cart right now (product decision; widen later).
-const CART_ALLOWED: ContentType[] = ['course'];
+// Courses and bundles can be added to the cart. A bundle line is expanded into
+// its course entitlements on paid checkout (grantPurchaseAccess, migration 036).
+const CART_ALLOWED: ContentType[] = ['course', 'bundle'];
 
 export async function GET() {
   const auth = await getCurrentUser();
