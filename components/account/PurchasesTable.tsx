@@ -181,6 +181,8 @@ type OrderDetail = {
     updated_at: string;
     amount: number;
     original_amount: number | null;
+    coupon_code: string | null;
+    coupon_discount: number | null;
     currency: string;
     content_type: string;
     product_title: string;
@@ -344,6 +346,19 @@ export function PurchaseDetailModal({ publicOrderId, onClose }: { publicOrderId:
             <Section title="סכומים">
               {o.original_amount != null && o.original_amount !== o.amount && (
                 <Row label="מחיר מקורי" value={formatAmount(o.original_amount, o.currency)} />
+              )}
+              {o.coupon_code && (
+                <Row
+                  label="קופון"
+                  value={
+                    <span className="inline-flex items-center gap-2">
+                      <span className="font-mono font-semibold text-brand-purple-700" dir="ltr">{o.coupon_code}</span>
+                      {o.coupon_discount != null && o.coupon_discount > 0 && (
+                        <span className="text-emerald-600 font-semibold">−{formatAmount(o.coupon_discount, o.currency)}</span>
+                      )}
+                    </span>
+                  }
+                />
               )}
               <Row label="סכום ששולם" value={formatAmount(o.amount, o.currency)} />
               <Row label="מטבע" value={o.currency} mono />

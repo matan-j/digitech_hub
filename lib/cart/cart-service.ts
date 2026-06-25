@@ -16,6 +16,12 @@ import 'server-only';
 import { createServiceClient } from '@/lib/supabase/server';
 import { resolveFinalPrice } from '@/lib/payments/pricing';
 import type { ContentType } from '@/lib/payments/order-service';
+import {
+  getCartCouponCode,
+  validateCoupon,
+  clearCartCoupon,
+  type CouponApplication,
+} from '@/lib/payments/coupon-service';
 
 /** A cart line enriched with the current (server-trusted) price + display data. */
 export type CartLine = {
@@ -35,12 +41,24 @@ export type CartLine = {
   added_at: string;
 };
 
+/** The coupon currently applied to the cart (validated, priced). */
+export type AppliedCoupon = {
+  code: string;
+  /** Amount (ILS) the coupon takes off total_after. */
+  discount: number;
+  applies_to: 'all' | 'specific';
+};
+
 export type CartSummary = {
   items: CartLine[];
   /** Sum of list prices. */
   total_before: number;
   /** Sum of final prices (what the customer pays before any coupon). */
   total_after: number;
+  /** The applied coupon (null when none / auto-dropped as invalid). */
+  coupon: AppliedCoupon | null;
+  /** total_after minus the coupon discount (what we actually charge). */
+  total_after_coupon: number;
   currency: string;
   count: number;
 };
@@ -62,7 +80,17 @@ export async function getCart(userId: string): Promise<CartSummary> {
 
   const cart = (rows ?? []) as CartRow[];
   if (cart.length === 0) {
-    return { items: [], total_before: 0, total_after: 0, currency: 'ILS', count: 0 };
+    // An empty cart can hold no coupon — drop any stale application.
+    await clearCartCoupon(userId);
+    return {
+      items: [],
+      total_before: 0,
+      total_after: 0,
+      coupon: null,
+      total_after_coupon: 0,
+      currency: 'ILS',
+      count: 0,
+    };
   }
 
   const ids = cart.map((r) => r.content_id);
@@ -101,14 +129,40 @@ export async function getCart(userId: string): Promise<CartSummary> {
 
   const total_before = items.reduce((s, i) => s + i.price_before, 0);
   const total_after = items.reduce((s, i) => s + i.price_after, 0);
+
+  // Apply the cart's coupon if one is set. Re-validated on every load against the
+  // live cart — if it no longer holds (expired, cart changed, etc.) we drop it so
+  // the cart never shows a phantom discount.
+  let coupon: AppliedCoupon | null = null;
+  let total_after_coupon = total_after;
+  const code = await getCartCouponCode(userId);
+  if (code) {
+    const res = await validateCoupon(
+      code,
+      userId,
+      items.map((i) => ({ content_id: i.content_id, price_after: i.price_after })),
+    );
+    if (res.ok) {
+      coupon = { code: res.code, discount: res.discount, applies_to: res.applies_to };
+      total_after_coupon = res.total_after_coupon;
+    } else {
+      await clearCartCoupon(userId);
+    }
+  }
+
   return {
     items,
     total_before,
     total_after,
+    coupon,
+    total_after_coupon,
     currency: items[0]?.currency ?? 'ILS',
     count: items.length,
   };
 }
+
+/** Exposed for the checkout route's server-trusted re-validation. */
+export type { CouponApplication };
 
 /**
  * Add one unit of a product to the cart. Idempotent — the UNIQUE constraint means

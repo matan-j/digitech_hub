@@ -27,6 +27,9 @@ export type Order = {
   checkout_url: string | null;
   document_id: string | null;
   document_url: string | null;
+  coupon_id: string | null;
+  coupon_code: string | null;
+  coupon_discount: number | null;
   request_webhook_status: RequestWebhookStatus;
   request_webhook_sent_at: string | null;
   request_webhook_error: string | null;
@@ -42,6 +45,8 @@ export async function createPendingOrder(params: {
   originalAmount?: number | null;
   currency: string;
   provider?: OrderProvider;
+  /** Snapshot of the applied coupon (local only — never sent to any webhook). */
+  coupon?: { id: string; code: string; discount: number } | null;
 }): Promise<Order> {
   const supabase = createServiceClient();
   const { data, error } = await supabase
@@ -56,6 +61,9 @@ export async function createPendingOrder(params: {
       original_amount: params.originalAmount ?? params.amount,
       currency: params.currency,
       status: 'pending',
+      coupon_id: params.coupon?.id ?? null,
+      coupon_code: params.coupon?.code ?? null,
+      coupon_discount: params.coupon?.discount ?? null,
     })
     .select('*')
     .single();

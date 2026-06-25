@@ -17,10 +17,10 @@ function shekel(n: number): string {
  * the menu always covers it. The expanded panel is z-[55] (a deliberate action).
  */
 export default function MiniCart() {
-  const { cart, ready, open, setOpen, busy, remove, checkout } = useCart();
+  const { cart, ready, open, setOpen, busy, remove, applyCoupon, removeCoupon, checkout } = useCart();
   const [shown, setShown] = useState(false); // drives the slide-up transition
   const [coupon, setCoupon] = useState('');
-  const [couponNote, setCouponNote] = useState(false);
+  const [couponErr, setCouponErr] = useState<string | null>(null);
   const [needPhone, setNeedPhone] = useState(false);
   const [phone, setPhone] = useState('');
   const [err, setErr] = useState<string | null>(null);
@@ -53,9 +53,18 @@ export default function MiniCart() {
     // redirect / pending → navigation happens inside checkout()
   }
 
+  async function onApplyCoupon() {
+    setCouponErr(null);
+    const r = await applyCoupon(coupon.trim());
+    if (r.ok) setCoupon('');
+    else setCouponErr(r.message ?? 'הקופון לא תקף.');
+  }
+
   if (!ready || cart.count === 0) return null;
 
-  const discount = cart.total_before - cart.total_after;
+  const saleDiscount = cart.total_before - cart.total_after;
+  const couponDiscount = cart.coupon?.discount ?? 0;
+  const payable = cart.total_after_coupon;
   const securePillCls =
     'inline-flex items-center gap-1.5 rounded-pill bg-white px-3.5 py-2 text-sm font-extrabold text-brand-purple-800 shadow-sm transition-colors hover:bg-brand-purple-50 disabled:opacity-70';
 
@@ -78,7 +87,7 @@ export default function MiniCart() {
             </span>
             <span className="flex flex-col leading-tight">
               <span className="text-sm font-extrabold">סל הקניות · {cart.count}</span>
-              <span className="text-xs text-white/80">{shekel(cart.total_after)}</span>
+              <span className="text-xs text-white/80">{shekel(payable)}</span>
             </span>
           </div>
           {/* end (left in RTL): secure-purchase button with lock — visible while closed */}
@@ -180,29 +189,52 @@ export default function MiniCart() {
 
             {/* footer: coupon + summary + checkout */}
             <div className="space-y-3 border-t border-neutral-100 px-5 py-4">
-              {/* coupon — visual only for now */}
+              {/* coupon — one per cart (no stacking). Applied → chip with an X. */}
               <div>
-                <div className="flex items-center gap-2">
-                  <div className="relative flex-1">
-                    <Tag className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
-                    <input
-                      type="text"
-                      value={coupon}
-                      onChange={(e) => setCoupon(e.target.value)}
-                      placeholder="קוד קופון"
-                      className="w-full rounded-pill border border-neutral-200 bg-neutral-50 py-2.5 pr-9 pl-3 text-sm text-neutral-900 outline-none focus:border-brand-purple-400"
-                    />
+                {cart.coupon ? (
+                  <div className="flex items-center justify-between gap-2 rounded-pill border border-emerald-200 bg-emerald-50 py-2 pr-3 pl-1.5">
+                    <span className="inline-flex min-w-0 items-center gap-1.5 text-sm font-bold text-emerald-700">
+                      <Tag className="h-4 w-4 shrink-0" />
+                      <span className="truncate font-mono" dir="ltr">{cart.coupon.code}</span>
+                      <span className="font-semibold">· −{shekel(couponDiscount)}</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => void removeCoupon()}
+                      disabled={busy}
+                      aria-label="הסר קופון"
+                      title="הסר קופון"
+                      className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-emerald-600 transition-colors hover:bg-emerald-100 disabled:opacity-50"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setCouponNote(true)}
-                    className="rounded-pill border border-brand-purple-200 px-4 py-2.5 text-sm font-bold text-brand-purple-700 transition-colors hover:bg-brand-purple-50"
-                  >
-                    החל
-                  </button>
-                </div>
-                {couponNote && (
-                  <p className="mt-1.5 pr-1 text-xs text-neutral-400">קופונים יופעלו בקרוב.</p>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-2">
+                      <div className="relative flex-1">
+                        <Tag className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
+                        <input
+                          type="text"
+                          value={coupon}
+                          onChange={(e) => { setCoupon(e.target.value.toUpperCase()); setCouponErr(null); }}
+                          onKeyDown={(e) => { if (e.key === 'Enter' && coupon.trim()) void onApplyCoupon(); }}
+                          placeholder="קוד קופון"
+                          dir="ltr"
+                          className="w-full rounded-pill border border-neutral-200 bg-neutral-50 py-2.5 pr-9 pl-3 text-left text-sm font-mono uppercase text-neutral-900 outline-none focus:border-brand-purple-400"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => void onApplyCoupon()}
+                        disabled={busy || coupon.trim().length === 0}
+                        className="rounded-pill border border-brand-purple-200 px-4 py-2.5 text-sm font-bold text-brand-purple-700 transition-colors hover:bg-brand-purple-50 disabled:opacity-50"
+                      >
+                        החל
+                      </button>
+                    </div>
+                    {couponErr && <p className="mt-1.5 pr-1 text-xs text-red-600">{couponErr}</p>}
+                  </>
                 )}
               </div>
 
@@ -212,15 +244,21 @@ export default function MiniCart() {
                   <dt>סכום ביניים</dt>
                   <dd>{shekel(cart.total_before)}</dd>
                 </div>
-                {discount > 0 && (
+                {saleDiscount > 0 && (
                   <div className="flex items-center justify-between text-emerald-600">
                     <dt>הנחה</dt>
-                    <dd>−{shekel(discount)}</dd>
+                    <dd>−{shekel(saleDiscount)}</dd>
+                  </div>
+                )}
+                {couponDiscount > 0 && (
+                  <div className="flex items-center justify-between text-emerald-600">
+                    <dt>קופון {cart.coupon?.code}</dt>
+                    <dd>−{shekel(couponDiscount)}</dd>
                   </div>
                 )}
                 <div className="flex items-center justify-between border-t border-neutral-100 pt-1.5 text-base font-extrabold text-neutral-950">
                   <dt>סה״כ לתשלום</dt>
-                  <dd>{shekel(cart.total_after)}</dd>
+                  <dd>{shekel(payable)}</dd>
                 </div>
               </dl>
 
@@ -251,7 +289,7 @@ export default function MiniCart() {
                 className="flex w-full items-center justify-center gap-2 rounded-pill bg-brand-purple-700 px-4 py-3 text-sm font-extrabold text-white transition-colors hover:bg-brand-purple-600 disabled:opacity-60"
               >
                 {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
-                רכישה מאובטחת · {shekel(cart.total_after)}
+                רכישה מאובטחת · {shekel(payable)}
               </button>
             </div>
           </div>

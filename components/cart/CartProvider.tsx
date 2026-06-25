@@ -24,10 +24,18 @@ export type CartLine = {
   added_at: string;
 };
 
+export type AppliedCoupon = {
+  code: string;
+  discount: number;
+  applies_to: 'all' | 'specific';
+};
+
 export type CartSummary = {
   items: CartLine[];
   total_before: number;
   total_after: number;
+  coupon: AppliedCoupon | null;
+  total_after_coupon: number;
   currency: string;
   count: number;
 };
@@ -50,6 +58,9 @@ type CartContextValue = {
   /** Add one unit; opens the cart on success. Returns whether it succeeded. */
   add: (slug: string, contentType?: string) => Promise<boolean>;
   remove: (contentId: string) => Promise<void>;
+  /** Apply a coupon code. Returns whether it stuck + a message on failure. */
+  applyCoupon: (code: string) => Promise<{ ok: boolean; message?: string }>;
+  removeCoupon: () => Promise<void>;
   checkout: (phone?: string) => Promise<CheckoutResult>;
 };
 
@@ -57,6 +68,8 @@ const EMPTY: CartSummary = {
   items: [],
   total_before: 0,
   total_after: 0,
+  coupon: null,
+  total_after_coupon: 0,
   currency: 'ILS',
   count: 0,
 };
@@ -69,13 +82,19 @@ export function useCart(): CartContextValue {
   return ctx;
 }
 
-function recompute(items: CartLine[]): CartSummary {
+// Optimistic recompute (used while a remove syncs). Carries the applied coupon
+// forward; the server response reconciles the exact discount right after.
+function recompute(items: CartLine[], coupon: AppliedCoupon | null): CartSummary {
   const total_before = items.reduce((s, i) => s + i.price_before, 0);
   const total_after = items.reduce((s, i) => s + i.price_after, 0);
+  const keepCoupon = items.length > 0 ? coupon : null;
+  const total_after_coupon = Math.max(0, total_after - (keepCoupon?.discount ?? 0));
   return {
     items,
     total_before,
     total_after,
+    coupon: keepCoupon,
+    total_after_coupon,
     currency: items[0]?.currency ?? 'ILS',
     count: items.length,
   };
@@ -124,13 +143,44 @@ export default function CartProvider({ children }: { children: ReactNode }) {
   const remove = useCallback(async (contentId: string) => {
     setBusy(true);
     // Optimistic: drop it locally, then reconcile with the server response.
-    setCart((prev) => recompute(prev.items.filter((i) => i.content_id !== contentId)));
+    setCart((prev) => recompute(prev.items.filter((i) => i.content_id !== contentId), prev.coupon));
     try {
       const res = await fetch('/api/cart', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ contentId }),
       });
+      if (res.ok) setCart((await res.json()) as CartSummary);
+    } finally {
+      setBusy(false);
+    }
+  }, []);
+
+  const applyCoupon = useCallback(async (code: string): Promise<{ ok: boolean; message?: string }> => {
+    setBusy(true);
+    try {
+      const res = await fetch('/api/cart/coupon', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setCart(d as CartSummary);
+        return { ok: true };
+      }
+      return { ok: false, message: (d?.message as string) ?? 'הקופון לא תקף.' };
+    } catch {
+      return { ok: false, message: 'שגיאת רשת.' };
+    } finally {
+      setBusy(false);
+    }
+  }, []);
+
+  const removeCoupon = useCallback(async () => {
+    setBusy(true);
+    try {
+      const res = await fetch('/api/cart/coupon', { method: 'DELETE' });
       if (res.ok) setCart((await res.json()) as CartSummary);
     } finally {
       setBusy(false);
@@ -178,7 +228,7 @@ export default function CartProvider({ children }: { children: ReactNode }) {
 
   return (
     <CartContext.Provider
-      value={{ cart, ready, open, busy, setOpen, has, refresh, add, remove, checkout }}
+      value={{ cart, ready, open, busy, setOpen, has, refresh, add, remove, applyCoupon, removeCoupon, checkout }}
     >
       {children}
     </CartContext.Provider>

@@ -13,14 +13,19 @@
 //   * Returns the GROW payment link. Access is granted only later by the verified
 //     success webhook, which grants one entitlement per order_items row.
 //
-// Coupon (future): when a real coupon exists, reduce `amount` here to the post-
-// coupon total — it is already the field GROW charges and we validate against.
+// Coupon: a coupon applied to the cart (cart_coupons) is re-validated server-side
+// here and only LOWERS `amount` to the post-coupon total — the field GROW already
+// charges and validates against. The code is snapshotted on the local order
+// (orders.coupon_*) but never added to the webhook payload. Redemption is recorded
+// only once the order is verified paid (success webhook).
 // ============================================================
 
 import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
-import { getCart } from '@/lib/cart/cart-service';
+import { getCart, clearCartItems } from '@/lib/cart/cart-service';
+import { validateCoupon, clearCartCoupon, recordRedemption } from '@/lib/payments/coupon-service';
+import { grantEntitlement } from '@/lib/payments/entitlement-service';
 import {
   createPendingOrder,
   createOrderItems,
@@ -28,6 +33,7 @@ import {
   setOrderProviderRef,
   markRequestWebhook,
   markOrderFailed,
+  markOrderPaid,
 } from '@/lib/payments/order-service';
 import {
   sendPurchaseRequestWebhook,
@@ -49,10 +55,73 @@ export async function POST(request: Request) {
   if (cart.count === 0) {
     return NextResponse.json({ error: 'empty_cart' }, { status: 400 });
   }
-  // A fully-free basket can't go through the payment link. Out of V1 scope —
-  // free items are handled by the single-item flow.
-  if (cart.total_after <= 0) {
-    return NextResponse.json({ error: 'nothing_to_charge' }, { status: 400 });
+
+  // Server-trusted coupon re-validation (defense in depth on top of getCart). It
+  // yields the coupon_id we snapshot on the order and the exact amount to charge.
+  // The coupon ONLY lowers the amount — the webhook payload shape is unchanged.
+  let coupon: { id: string; code: string; discount: number } | null = null;
+  let payable = cart.total_after;
+  if (cart.coupon) {
+    const res = await validateCoupon(
+      cart.coupon.code,
+      auth.userId,
+      cart.items.map((i) => ({ content_id: i.content_id, price_after: i.price_after })),
+    );
+    if (res.ok) {
+      coupon = { id: res.coupon_id, code: res.code, discount: res.discount };
+      payable = res.total_after_coupon;
+    } else {
+      await clearCartCoupon(auth.userId); // went stale between cart load + checkout
+    }
+  }
+
+  // A coupon that zeroes the basket → grant immediately, no payment link (mirrors
+  // the single-item free path). Records the redemption against a paid £0 order.
+  if (payable <= 0) {
+    const order = await createPendingOrder({
+      userId: auth.userId,
+      contentType: 'bundle',
+      contentId: auth.userId,
+      amount: 0,
+      originalAmount: cart.total_before,
+      currency: cart.currency,
+      coupon,
+    });
+    await createOrderItems(
+      order.id,
+      cart.items.map((i) => ({
+        contentType: i.content_type,
+        contentId: i.content_id,
+        productTitle: i.title,
+        coverUrl: i.cover_url,
+        priceBefore: i.price_before,
+        priceAfter: i.price_after,
+      })),
+    );
+    await markOrderPaid(order.id, `free-${order.public_order_id}`);
+    for (const i of cart.items) {
+      await grantEntitlement({
+        userId: auth.userId,
+        resourceType: i.content_type,
+        resourceId: i.content_id,
+        orderId: order.id,
+        source: 'purchase',
+      });
+    }
+    if (coupon) {
+      await recordRedemption({
+        couponId: coupon.id,
+        userId: auth.userId,
+        orderId: order.id,
+        discount: coupon.discount,
+      });
+    }
+    await clearCartItems(auth.userId, cart.items.map((i) => i.content_id));
+    await clearCartCoupon(auth.userId);
+    return NextResponse.json({
+      status: 'redirect',
+      url: `/learn/checkout/success?order=${encodeURIComponent(order.public_order_id)}`,
+    });
   }
 
   // Phone is required for the lead (same rule as single-item). Prefer the stored
@@ -78,7 +147,7 @@ export async function POST(request: Request) {
   // partial-unique index frees up, and build a fresh one.
   const existing = await getOpenPendingOrder(auth.userId, 'bundle', auth.userId);
   if (existing) {
-    if (existing.checkout_url && Number(existing.amount) === cart.total_after) {
+    if (existing.checkout_url && Number(existing.amount) === payable) {
       return NextResponse.json({ status: 'redirect', url: existing.checkout_url });
     }
     await markOrderFailed(existing.id);
@@ -88,9 +157,10 @@ export async function POST(request: Request) {
     userId: auth.userId,
     contentType: 'bundle',
     contentId: auth.userId, // one open bundle per user (partial-unique index)
-    amount: cart.total_after,
+    amount: payable,
     originalAmount: cart.total_before,
     currency: cart.currency,
+    coupon,
   });
 
   await createOrderItems(
@@ -132,7 +202,9 @@ export async function POST(request: Request) {
     content_type: 'bundle',
     content_id: auth.userId,
     content_slug: 'cart',
-    amount: cart.total_after,
+    // Post-coupon total — the only figure GROW charges. The coupon code itself is
+    // intentionally NOT part of this payload (webhook contract unchanged).
+    amount: payable,
     original_amount: cart.total_before,
     currency: cart.currency,
   };

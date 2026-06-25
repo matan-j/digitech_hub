@@ -28,14 +28,21 @@ export default async function CheckoutSuccessPage({
   const supabase = await createClient();
 
   // Resolve the course slug — from the order (owner-only via RLS) or the param.
+  // Also pull the coupon snapshot to confirm it on the receipt.
   let slug = courseParam ?? null;
-  if (!slug && publicOrderId) {
+  let couponCode: string | null = null;
+  let couponDiscount: number | null = null;
+  let currency = 'ILS';
+  if (publicOrderId) {
     const { data: order } = await supabase
       .from('orders')
-      .select('content_id')
+      .select('content_id, coupon_code, coupon_discount, currency')
       .eq('public_order_id', publicOrderId)
       .maybeSingle();
-    if (order?.content_id) {
+    couponCode = (order?.coupon_code as string | null) ?? null;
+    couponDiscount = order?.coupon_discount != null ? Number(order.coupon_discount) : null;
+    currency = (order?.currency as string | null) ?? 'ILS';
+    if (!slug && order?.content_id) {
       const { data: item } = await supabase
         .from('content_items')
         .select('slug')
@@ -74,6 +81,19 @@ export default async function CheckoutSuccessPage({
           <p className="text-[11px] font-semibold uppercase tracking-wide text-brand-purple-700 mb-1">קיבלת</p>
           <p className="font-bold text-neutral-900">{title ?? 'הקורס שלך'}</p>
           <p className="text-xs text-emerald-700 mt-1">הגישה פעילה ✓</p>
+          {couponCode && (
+            <div className="mt-3 pt-3 border-t border-brand-purple-100/70 flex items-center justify-between gap-2">
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500">שולם עם קופון</span>
+              <span className="inline-flex items-center gap-2">
+                <span className="font-mono text-sm font-bold text-brand-purple-700" dir="ltr">{couponCode}</span>
+                {couponDiscount != null && couponDiscount > 0 && (
+                  <span className="text-xs font-semibold text-emerald-700">
+                    חסכת {currency === 'ILS' ? `₪${couponDiscount.toLocaleString('he-IL')}` : `${couponDiscount} ${currency}`}
+                  </span>
+                )}
+              </span>
+            </div>
+          )}
           {publicOrderId && (
             <div className="mt-3 pt-3 border-t border-brand-purple-100/70 flex items-center justify-between gap-2">
               <span className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500">מספר הזמנה</span>

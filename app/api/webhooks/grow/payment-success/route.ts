@@ -29,6 +29,7 @@ import {
 } from '@/lib/payments/order-service';
 import { grantEntitlement } from '@/lib/payments/entitlement-service';
 import { clearCartItems } from '@/lib/cart/cart-service';
+import { recordRedemption, clearCartCoupon } from '@/lib/payments/coupon-service';
 import { createServiceClient } from '@/lib/supabase/server';
 
 export const runtime = 'nodejs';
@@ -227,6 +228,20 @@ export async function POST(request: Request) {
       source: 'purchase',
     });
   }
+  // Coupon (if any was applied at checkout) → record the redemption now that the
+  // order is verified paid. recordRedemption is idempotent and burns a 'global'
+  // one-time coupon (is_redeemed + deactivate). The code lives on the order row,
+  // not the webhook payload.
+  if (order.coupon_id) {
+    await recordRedemption({
+      couponId: order.coupon_id,
+      userId: order.user_id,
+      orderId: order.id,
+      discount: order.coupon_discount != null ? Number(order.coupon_discount) : 0,
+    });
+    await clearCartCoupon(order.user_id);
+  }
+
   if (documentUrl) await setOrderInvoice(order.id, { documentUrl });
   await logEvent({ orderId: order.id, eventId, status: 'processed', raw: payload });
 

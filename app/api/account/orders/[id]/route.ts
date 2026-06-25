@@ -111,6 +111,8 @@ export async function GET(_request: Request, ctx: { params: Promise<{ id: string
       updated_at: order.updated_at,
       amount: Number(order.amount),
       original_amount: order.original_amount != null ? Number(order.original_amount) : null,
+      coupon_code: order.coupon_code ?? null,
+      coupon_discount: order.coupon_discount != null ? Number(order.coupon_discount) : null,
       currency: order.currency,
       content_type: order.content_type,
       product_title: productTitle,
