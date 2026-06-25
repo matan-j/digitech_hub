@@ -19,7 +19,7 @@ import crypto from 'crypto';
 import { createServiceClient } from '@/lib/supabase/server';
 import { sumitGetPayment, sumitGetDocumentDownloadUrl } from './sumit';
 import { markOrderPaid, markOrderFailed, setOrderInvoice, validatePaymentAgainstOrder, type Order } from './order-service';
-import { grantEntitlement } from './entitlement-service';
+import { grantPurchaseAccess } from './entitlement-service';
 
 export type SettleSource = 'confirm' | 'webhook';
 
@@ -146,7 +146,10 @@ export async function settleSumitOrder(params: {
 
   // Verified + matching → settle and grant. Both steps are idempotent.
   await markOrderPaid(order.id, payment.transactionId);
-  await grantEntitlement({
+  // grantPurchaseAccess expands a 'bundle' order into a 'course' entitlement per
+  // included course (migration 036); a plain course/guide behaves like
+  // grantEntitlement. Idempotent, so settlement retries stay safe.
+  await grantPurchaseAccess({
     userId: order.user_id,
     resourceType: order.content_type,
     resourceId: order.content_id,

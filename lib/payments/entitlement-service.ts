@@ -93,19 +93,48 @@ export async function hasActiveEntitlement(
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return false;
-  const { data } = await supabase
+  const nowIso = new Date().toISOString();
+  // Mirror the DB's has_entitlement(): an entitlement with a past expires_at is
+  // NOT active. Without this the app could render an unlocked lesson link that
+  // the RLS read then rejects → 404.
+  const activeFilter = `expires_at.is.null,expires_at.gt.${nowIso}`;
+
+  // Direct entitlement on the resource itself.
+  const { data: direct } = await supabase
     .from('entitlements')
     .select('id')
     .eq('user_id', user.id)
     .eq('resource_type', resourceType)
     .eq('resource_id', resourceId)
     .eq('status', 'active')
-    // Mirror the DB's has_entitlement(): an entitlement with a past expires_at is
-    // NOT active. Without this the app could render an unlocked lesson link that
-    // the RLS read then rejects → 404.
-    .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
+    .or(activeFilter)
     .maybeSingle();
-  return !!data;
+  if (direct) return true;
+
+  // A 'course' is ALSO unlocked by an active 'bundle' entitlement that contains
+  // it — assignment of a bundle grants full access to every course inside,
+  // regardless of whether per-course entitlement rows were ever materialised.
+  // Mirrors the bundle-aware has_entitlement() in the DB (migration 042).
+  if (resourceType === 'course') {
+    const { data: items } = await supabase
+      .from('bundle_items')
+      .select('bundle_id')
+      .eq('course_id', resourceId);
+    const bundleIds = (items ?? []).map((r) => (r as { bundle_id: string }).bundle_id);
+    if (bundleIds.length) {
+      const { data: viaBundle } = await supabase
+        .from('entitlements')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('resource_type', 'bundle')
+        .in('resource_id', bundleIds)
+        .eq('status', 'active')
+        .or(activeFilter)
+        .limit(1);
+      if (viaBundle && viaBundle.length > 0) return true;
+    }
+  }
+  return false;
 }
 
 /**
