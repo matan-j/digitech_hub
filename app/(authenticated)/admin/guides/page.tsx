@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { listContent } from '@/lib/learn/db';
 import { Plus, FileText } from 'lucide-react';
 import ContentTabs from '@/components/learn-admin/ContentTabs';
+import DeleteRowButton from '@/components/learn-admin/DeleteRowButton';
 
 export const metadata = { title: 'ניהול הדרכות — Digitech Learning Hub' };
 export const dynamic = 'force-dynamic';
@@ -57,6 +58,7 @@ export default async function GuidesAdminIndex() {
                 <th className="text-right px-4 py-3 font-semibold">סטטוס</th>
                 <th className="text-right px-4 py-3 font-semibold">מנוי</th>
                 <th className="text-right px-4 py-3 font-semibold">עודכן</th>
+                <th className="px-4 py-3" />
               </tr>
             </thead>
             <tbody>
@@ -89,6 +91,12 @@ export default async function GuidesAdminIndex() {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-neutral-500 text-xs">{formatDate(g.updated_at)}</td>
+                  <td className="px-4 py-3">
+                    <DeleteRowButton
+                      endpoint={`/api/content/guide/${g.slug}`}
+                      label={g.title}
+                    />
+                  </td>
                 </tr>
               ))}
             </tbody>

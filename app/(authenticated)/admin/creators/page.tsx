@@ -3,6 +3,7 @@ import { Plus, Users, Star } from 'lucide-react';
 import { createServiceClient } from '@/lib/supabase/server';
 import { listCreators, getCreatorStats } from '@/lib/learn/db';
 import ContentTabs from '@/components/learn-admin/ContentTabs';
+import DeleteRowButton from '@/components/learn-admin/DeleteRowButton';
 
 export const metadata = { title: 'ניהול יוצרים — Digitech Learning Hub' };
 export const dynamic = 'force-dynamic';
@@ -60,6 +61,7 @@ export default async function CreatorsAdminPage() {
                 <th className="text-right px-4 py-3 font-semibold">פלייליסטים</th>
                 <th className="text-right px-4 py-3 font-semibold">Featured</th>
                 <th className="text-right px-4 py-3 font-semibold">סטטוס</th>
+                <th className="px-4 py-3" />
               </tr>
             </thead>
             <tbody>
@@ -95,6 +97,12 @@ export default async function CreatorsAdminPage() {
                     >
                       {creator.status === 'active' ? 'פעיל' : 'מושבת'}
                     </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <DeleteRowButton
+                      endpoint={`/api/admin/creators/${creator.id}`}
+                      label={creator.name}
+                    />
                   </td>
                 </tr>
               ))}

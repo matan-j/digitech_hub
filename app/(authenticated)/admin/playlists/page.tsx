@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { Plus, ListVideo } from 'lucide-react';
 import { listPlaylists, getPlaylistItemCounts } from '@/lib/learn/db';
 import ContentTabs from '@/components/learn-admin/ContentTabs';
+import DeleteRowButton from '@/components/learn-admin/DeleteRowButton';
 
 export const metadata = { title: 'ניהול פלייליסטים — Digitech Learning Hub' };
 export const dynamic = 'force-dynamic';
@@ -46,6 +47,7 @@ export default async function PlaylistsAdminPage() {
                 <th className="text-right px-4 py-3 font-semibold">יוצר</th>
                 <th className="text-right px-4 py-3 font-semibold">הדרכות</th>
                 <th className="text-right px-4 py-3 font-semibold">סטטוס</th>
+                <th className="px-4 py-3" />
               </tr>
             </thead>
             <tbody>
@@ -60,6 +62,12 @@ export default async function PlaylistsAdminPage() {
                     <span className={['inline-block px-2 py-0.5 rounded-pill text-[11px] font-semibold', p.status === 'published' ? 'bg-emerald-100 text-emerald-800' : 'bg-neutral-200 text-neutral-700'].join(' ')}>
                       {p.status === 'published' ? 'פורסם' : 'טיוטה'}
                     </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <DeleteRowButton
+                      endpoint={`/api/playlists/${p.id}`}
+                      label={p.title}
+                    />
                   </td>
                 </tr>
               ))}
