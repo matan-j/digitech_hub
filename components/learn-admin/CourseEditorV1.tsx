@@ -492,7 +492,7 @@ export default function CourseEditorV1({ initial }: Props) {
             />
           </div>
           <div className="flex flex-col items-end gap-2">
-            <SaveIndicator state={saveState} onForceSave={saveNow} />
+            <SaveIndicator state={saveState} onForceSave={saveNow} initialSavedAt={initial.updated_at} />
             <a
               href={`/learn/courses/${initial.slug}`}
               target="_blank"

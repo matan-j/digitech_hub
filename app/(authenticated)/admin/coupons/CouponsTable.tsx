@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, X, Loader2, Trash2, GraduationCap, Package, User as UserIcon, Ticket } from 'lucide-react';
+import { Plus, X, Loader2, Trash2, GraduationCap, Package, User as UserIcon, Ticket, Copy, Check } from 'lucide-react';
 
 export type CouponRow = {
   id: string;
@@ -48,6 +48,32 @@ function statusOf(c: CouponRow): { label: string; cls: string } {
   if (!c.is_active) return { label: 'לא פעיל', cls: 'bg-neutral-100 text-neutral-600' };
   if (c.valid_until && new Date(c.valid_until).getTime() < Date.now()) return { label: 'פג תוקף', cls: 'bg-amber-100 text-amber-800' };
   return { label: 'פעיל', cls: 'bg-emerald-100 text-emerald-800' };
+}
+
+/** Icon-only button that copies the coupon code to the clipboard. */
+function CopyCodeButton({ code }: { code: string }) {
+  const [copied, setCopied] = useState(false);
+
+  async function copy(e: React.MouseEvent) {
+    e.stopPropagation(); // don't open the edit modal
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch { /* clipboard unavailable */ }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={copy}
+      className="grid place-items-center w-7 h-7 rounded-md text-neutral-400 hover:text-brand-purple-700 hover:bg-brand-purple-50 transition-colors"
+      aria-label={`העתק את הקוד ${code}`}
+      title="העתק קוד"
+    >
+      {copied ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
+    </button>
+  );
 }
 
 export default function CouponsTable({
@@ -119,6 +145,7 @@ export default function CouponsTable({
               <th className="text-right px-4 py-3 font-semibold">שימוש</th>
               <th className="text-right px-4 py-3 font-semibold">תוקף</th>
               <th className="text-right px-4 py-3 font-semibold">סטטוס</th>
+              <th className="px-4 py-3 w-12"><span className="sr-only">פעולות</span></th>
             </tr>
           </thead>
           <tbody>
@@ -145,12 +172,15 @@ export default function CouponsTable({
                   <td className="px-4 py-3">
                     <span className={`inline-block px-2 py-0.5 rounded-pill text-[11px] font-semibold ${st.cls}`}>{st.label}</span>
                   </td>
+                  <td className="px-4 py-3 text-left">
+                    <CopyCodeButton code={c.code} />
+                  </td>
                 </tr>
               );
             })}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-4 py-12 text-center text-neutral-500">לא נמצאו קופונים.</td>
+                <td colSpan={8} className="px-4 py-12 text-center text-neutral-500">לא נמצאו קופונים.</td>
               </tr>
             )}
           </tbody>

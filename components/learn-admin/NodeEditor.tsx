@@ -293,14 +293,20 @@ export default function NodeEditor(props: Props) {
           </div>
 
           {kind === 'lesson' && (
-            <label className="flex items-center gap-2 text-xs cursor-pointer">
+            <label className="flex items-start gap-2 text-xs cursor-pointer">
               <input
                 type="checkbox"
                 checked={isPreview}
                 onChange={(e) => setIsPreview(e.target.checked)}
-                className="w-3.5 h-3.5 accent-brand-purple-700"
+                className="w-3.5 h-3.5 mt-0.5 accent-brand-purple-700"
               />
-              <span className="font-medium text-neutral-700">שיעור חופשי — נגיש גם ללא רכישה (תצוגה מקדימה)</span>
+              <span className="text-neutral-700">
+                <span className="font-medium">פתח שיעור זה ללא רכישה (תצוגה מקדימה)</span>
+                <span className="block text-[11px] text-neutral-500 mt-0.5">
+                  שיעורים נעולים כברירת מחדל. סמן כדי לפתוח שיעור בודד גם למי שלא רכש את הקורס.
+                  רוכשי הקורס רואים את כל השיעורים פתוחים בכל מקרה.
+                </span>
+              </span>
             </label>
           )}
 

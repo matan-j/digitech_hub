@@ -60,6 +60,11 @@ export default function CreatorProfileForm({ initial }: { initial: Creator }) {
 
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
 
+  const saveNow = useCallback(() => {
+    if (timer.current) clearTimeout(timer.current);
+    void persist();
+  }, [persist]);
+
   const labelCls = 'block text-xs font-semibold text-neutral-600 mb-1.5';
   const inputCls = 'w-full px-3 py-2 rounded-md border border-neutral-200 focus:border-brand-purple-400 focus:outline-none text-sm';
 
@@ -72,7 +77,7 @@ export default function CreatorProfileForm({ initial }: { initial: Creator }) {
           placeholder="שם היוצר"
           className="flex-1 text-2xl font-extrabold text-neutral-950 bg-transparent border-0 focus:outline-none focus:bg-neutral-50 rounded px-2 -mx-2 py-1"
         />
-        <SaveIndicator state={saveState} />
+        <SaveIndicator state={saveState} onForceSave={saveNow} initialSavedAt={initial.updated_at} />
       </header>
 
       <section className="bg-white rounded-2xl border border-neutral-200 p-5 grid sm:grid-cols-2 gap-4">

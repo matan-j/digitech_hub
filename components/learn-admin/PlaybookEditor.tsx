@@ -135,7 +135,7 @@ export default function PlaybookEditor({ initial }: Props) {
             />
           </div>
           <div className="flex flex-col items-end gap-2">
-            <SaveIndicator state={saveState} onForceSave={saveNow} />
+            <SaveIndicator state={saveState} onForceSave={saveNow} initialSavedAt={initial.updated_at} />
             <a
               href={publicUrl}
               target="_blank"

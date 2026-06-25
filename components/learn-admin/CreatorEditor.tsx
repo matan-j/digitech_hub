@@ -111,7 +111,7 @@ export default function CreatorEditor({ initial, users }: { initial: Creator; us
             />
             <p className="text-xs text-neutral-400 mt-1 font-mono" dir="ltr">/learn/creators/{form.slug}</p>
           </div>
-          <SaveIndicator state={saveState} onForceSave={saveNow} />
+          <SaveIndicator state={saveState} onForceSave={saveNow} initialSavedAt={initial.updated_at} />
         </div>
         <div className="flex flex-wrap items-center gap-2 mt-4 pt-4 border-t border-neutral-100">
           <a

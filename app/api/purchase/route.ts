@@ -145,13 +145,15 @@ async function paidViaMake(
 ) {
   const supabase = await createClient();
 
-  // Phone is required for the lead. Prefer the stored profile phone; accept and
-  // persist a freshly-collected one from the request.
-  const { data: profileRow } = await supabase
-    .from('profiles')
-    .select('phone, full_name')
-    .eq('id', auth.userId)
-    .maybeSingle();
+  // Phone is required for the lead. The profile read and the open-order lookup are
+  // independent, so fire them together instead of one after the other.
+  const [profileResult, existing] = await Promise.all([
+    supabase.from('profiles').select('phone, full_name').eq('id', auth.userId).maybeSingle(),
+    getOpenPendingOrder(auth.userId, contentType, item.id),
+  ]);
+  const profileRow = profileResult.data;
+
+  // Prefer the stored profile phone; accept + persist a freshly-collected one.
   let phone = (profileRow?.phone as string | null) ?? '';
   if (!phone && phoneInput) {
     phone = phoneInput;
@@ -162,33 +164,31 @@ async function paidViaMake(
     return NextResponse.json({ error: 'phone_required' }, { status: 400 });
   }
 
-  // Reuse an existing open order (idempotency) — never create a second one.
-  const existing = await getOpenPendingOrder(auth.userId, contentType, item.id);
-
   // Already have a GROW payment link for this open order → reuse it on a
   // double-click / refresh instead of creating a second link.
   if (existing?.checkout_url) {
     return NextResponse.json({ status: 'redirect', url: existing.checkout_url });
   }
 
-  const order =
+  // The order INSERT and the 1:1 cover resolution are independent — run them
+  // together. The cover is cached on the item (lazily generated + stored only on
+  // first use) and falls back to the original cover, never to empty.
+  const [order, squareImage] = await Promise.all([
     existing ??
-    (await createPendingOrder({
-      userId: auth.userId,
-      contentType,
-      contentId: item.id,
-      amount: price.final,
-      originalAmount: price.original,
-      currency: price.currency,
-    }));
-
-  // Always send a pre-cropped 1:1 cover (cached on the item; lazily generated +
-  // stored here on first use). Falls back to the original cover, never to empty.
-  const squareImage = await ensureSquareCoverUrl({
-    id: item.id,
-    coverUrl: item.cover_url,
-    coverSquareUrl: item.cover_square_url,
-  });
+      createPendingOrder({
+        userId: auth.userId,
+        contentType,
+        contentId: item.id,
+        amount: price.final,
+        originalAmount: price.original,
+        currency: price.currency,
+      }),
+    ensureSquareCoverUrl({
+      id: item.id,
+      coverUrl: item.cover_url,
+      coverSquareUrl: item.cover_square_url,
+    }),
+  ]);
 
   const payload: PurchaseWebhookPayload = {
     customer_name: (profileRow?.full_name as string | null) ?? auth.profile.full_name ?? '',

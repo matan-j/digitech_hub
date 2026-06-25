@@ -24,7 +24,7 @@ import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { getCart, clearCartItems } from '@/lib/cart/cart-service';
-import { validateCoupon, clearCartCoupon, recordRedemption } from '@/lib/payments/coupon-service';
+import { clearCartCoupon, recordRedemption } from '@/lib/payments/coupon-service';
 import { grantEntitlement } from '@/lib/payments/entitlement-service';
 import {
   createPendingOrder,
@@ -89,31 +89,37 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}));
   const phoneInput = typeof body.phone === 'string' ? body.phone.trim() : '';
 
-  const cart = await getCart(auth.userId);
+  // getCart already re-validates the coupon server-side on every load (and drops it
+  // if stale), so its result is authoritative — no second validateCoupon round-trip
+  // here. The profile read and the open-order lookup don't depend on the cart, so
+  // fire all three together instead of sequentially.
+  const supabase = await createClient();
+  const [cart, profileResult, existing] = await Promise.all([
+    getCart(auth.userId),
+    supabase.from('profiles').select('phone, full_name').eq('id', auth.userId).maybeSingle(),
+    getOpenPendingOrder(auth.userId, 'bundle', auth.userId),
+  ]);
+  const profileRow = profileResult.data;
   if (cart.count === 0) {
     return NextResponse.json({ error: 'empty_cart' }, { status: 400 });
   }
 
-  // Server-trusted coupon re-validation (defense in depth on top of getCart). It
-  // yields the coupon_id we snapshot on the order and the exact amount to charge.
-  // The coupon ONLY lowers the amount — the webhook payload shape is unchanged.
-  let coupon: { id: string; code: string; discount: number } | null = null;
-  let couponDetail: { applies_to: 'all' | 'specific'; line_discounts: Record<string, number> } | null = null;
-  let payable = cart.total_after;
-  if (cart.coupon) {
-    const res = await validateCoupon(
-      cart.coupon.code,
-      auth.userId,
-      cart.items.map((i) => ({ content_id: i.content_id, price_after: i.price_after })),
-    );
-    if (res.ok) {
-      coupon = { id: res.coupon_id, code: res.code, discount: res.discount };
-      couponDetail = { applies_to: res.applies_to, line_discounts: res.line_discounts };
-      payable = res.total_after_coupon;
-    } else {
-      await clearCartCoupon(auth.userId); // went stale between cart load + checkout
-    }
-  }
+  // Reuse the coupon getCart already validated + priced. It only LOWERS `amount` —
+  // the webhook payload shape is unchanged. The per-line breakdown is carried on the
+  // cart rows (coupon_discount), so we reconstruct line_discounts without a re-read.
+  const coupon = cart.coupon
+    ? { id: cart.coupon.id, code: cart.coupon.code, discount: cart.coupon.discount }
+    : null;
+  const couponDetail: { applies_to: 'all' | 'specific'; line_discounts: Record<string, number> } | null =
+    cart.coupon
+      ? {
+          applies_to: cart.coupon.applies_to,
+          line_discounts: Object.fromEntries(
+            cart.items.filter((i) => (i.coupon_discount ?? 0) > 0).map((i) => [i.content_id, i.coupon_discount]),
+          ),
+        }
+      : null;
+  const payable = cart.total_after_coupon;
 
   // A coupon that zeroes the basket → grant immediately, no payment link (mirrors
   // the single-item free path). Records the redemption against a paid £0 order.
@@ -165,13 +171,7 @@ export async function POST(request: Request) {
   }
 
   // Phone is required for the lead (same rule as single-item). Prefer the stored
-  // profile phone; accept + persist a freshly-collected one from the request.
-  const supabase = await createClient();
-  const { data: profileRow } = await supabase
-    .from('profiles')
-    .select('phone, full_name')
-    .eq('id', auth.userId)
-    .maybeSingle();
+  // profile phone (read above); accept + persist a freshly-collected one.
   let phone = (profileRow?.phone as string | null) ?? '';
   if (!phone && phoneInput) {
     phone = phoneInput;
@@ -184,8 +184,7 @@ export async function POST(request: Request) {
 
   // Reuse an open bundle order on a genuine double-click (same total + has link).
   // Otherwise the cart changed since last attempt → retire the stale order so the
-  // partial-unique index frees up, and build a fresh one.
-  const existing = await getOpenPendingOrder(auth.userId, 'bundle', auth.userId);
+  // partial-unique index frees up, and build a fresh one. (`existing` fetched above.)
   if (existing) {
     if (existing.checkout_url && Number(existing.amount) === payable) {
       return NextResponse.json({ status: 'redirect', url: existing.checkout_url });
@@ -193,15 +192,42 @@ export async function POST(request: Request) {
     await markOrderFailed(existing.id);
   }
 
-  const order = await createPendingOrder({
-    userId: auth.userId,
-    contentType: 'bundle',
-    contentId: auth.userId, // one open bundle per user (partial-unique index)
-    amount: payable,
-    originalAmount: cart.total_before,
-    currency: cart.currency,
-    coupon,
-  });
+  // Distribute the coupon across lines so each product's price_after_discount is
+  // the real post-coupon price (Σ == payable). Webhook structure is unchanged.
+  const lineCoupon = couponLineDiscounts(
+    cart.items.map((i) => ({ content_id: i.content_id, price_after: i.price_after })),
+    couponDetail,
+    coupon?.discount ?? 0,
+  );
+
+  // The order INSERT and the per-line 1:1 cover resolution are independent — run
+  // them together. Covers are cached on the item (lazily generated + stored only on
+  // first use); each falls back to the original cover, never to empty.
+  const [order, products] = await Promise.all([
+    createPendingOrder({
+      userId: auth.userId,
+      contentType: 'bundle',
+      contentId: auth.userId, // one open bundle per user (partial-unique index)
+      amount: payable,
+      originalAmount: cart.total_before,
+      currency: cart.currency,
+      coupon,
+    }),
+    Promise.all(
+      cart.items.map(async (i) => ({
+        product_name: i.title,
+        price_before_discount: i.price_before,
+        // Effective per-line price after the item sale AND the coupon's share.
+        price_after_discount: Math.max(0, round2(i.price_after - (lineCoupon[i.content_id] ?? 0))),
+        image_url:
+          (await ensureSquareCoverUrl({
+            id: i.content_id,
+            coverUrl: i.cover_url,
+            coverSquareUrl: i.cover_square_url,
+          })) ?? '',
+      })),
+    ),
+  ]);
 
   await createOrderItems(
     order.id,
@@ -212,31 +238,6 @@ export async function POST(request: Request) {
       coverUrl: i.cover_url,
       priceBefore: i.price_before,
       priceAfter: i.price_after,
-    })),
-  );
-
-  // Distribute the coupon across lines so each product's price_after_discount is
-  // the real post-coupon price (Σ == payable). Webhook structure is unchanged.
-  const lineCoupon = couponLineDiscounts(
-    cart.items.map((i) => ({ content_id: i.content_id, price_after: i.price_after })),
-    couponDetail,
-    coupon?.discount ?? 0,
-  );
-
-  // Resolve a pre-cropped 1:1 cover per line (cached on the item; lazily generated
-  // + stored on first use). Falls back to the original cover, never to empty.
-  const products = await Promise.all(
-    cart.items.map(async (i) => ({
-      product_name: i.title,
-      price_before_discount: i.price_before,
-      // Effective per-line price after the item sale AND the coupon's share.
-      price_after_discount: Math.max(0, round2(i.price_after - (lineCoupon[i.content_id] ?? 0))),
-      image_url:
-        (await ensureSquareCoverUrl({
-          id: i.content_id,
-          coverUrl: i.cover_url,
-          coverSquareUrl: i.cover_square_url,
-        })) ?? '',
     })),
   );
 

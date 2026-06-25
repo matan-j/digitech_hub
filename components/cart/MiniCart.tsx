@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Lock, ShieldCheck, X, Trash2, ShoppingBag, Loader2, Tag } from 'lucide-react';
 import { useCart } from './CartProvider';
+import RedirectingOverlay from '@/components/checkout/RedirectingOverlay';
 
 function shekel(n: number): string {
   return `₪${n % 1 === 0 ? n.toLocaleString('he-IL') : n.toFixed(2)}`;
@@ -24,6 +25,8 @@ export default function MiniCart() {
   const [needPhone, setNeedPhone] = useState(false);
   const [phone, setPhone] = useState('');
   const [err, setErr] = useState<string | null>(null);
+  // True only while we wait for the payment link → drives the full-screen overlay.
+  const [redirecting, setRedirecting] = useState(false);
 
   // Flip `shown` a frame after the panel mounts so it slides in. Closing is the
   // reverse, driven by close() (which sets shown=false before unmounting) — so we
@@ -43,14 +46,19 @@ export default function MiniCart() {
 
   async function runCheckout(withPhone?: string) {
     setErr(null);
+    setRedirecting(true); // overlay up while the payment link is built
     const r = await checkout(withPhone);
     if (r.status === 'phone_required') {
+      setRedirecting(false);
       setOpen(true);
       setNeedPhone(true);
       return;
     }
-    if (r.status === 'error') setErr(r.message ?? 'שגיאה. נסו שוב.');
-    // redirect / pending → navigation happens inside checkout()
+    if (r.status === 'error') {
+      setRedirecting(false);
+      setErr(r.message ?? 'שגיאה. נסו שוב.');
+    }
+    // redirect / pending → navigation happens inside checkout(); keep the overlay up.
   }
 
   async function onApplyCoupon() {
@@ -70,6 +78,8 @@ export default function MiniCart() {
 
   return (
     <>
+      <RedirectingOverlay show={redirecting} />
+
       {/* ---- Collapsed docked bar ---- */}
       <div className="fixed inset-x-0 bottom-0 z-40 px-3 pb-3 pointer-events-none">
         <div

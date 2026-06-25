@@ -1,18 +1,37 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowUp, ArrowDown, RotateCcw, Eye, GripVertical } from 'lucide-react';
+import { ArrowUp, ArrowDown, RotateCcw, Eye, GripVertical, Plus, Trash2 } from 'lucide-react';
 import SaveIndicator, { type SaveState } from './SaveIndicator';
+import InlineRichField from './InlineRichField';
+import ValueProps from '@/components/learn/ValueProps';
+import CreatorPills, { type PillCreator } from '@/components/learn/CreatorPills';
+import { BENEFIT_ICONS } from '@/components/learn/benefit-icons';
 import {
   DEFAULT_SECTIONS,
+  DEFAULT_BENEFITS,
   SECTION_META,
+  BENEFIT_ICON_KEYS,
   type HomepageSection,
+  type BenefitItem,
+  type BenefitIconKey,
 } from '@/lib/learn/homepage';
 
 const inputCls =
   'w-full px-3 py-2 rounded-md border border-neutral-200 focus:border-brand-purple-400 focus:outline-none text-sm';
 
-export default function HomepageStudio({ initial }: { initial: HomepageSection[] }) {
+function newBenefit(): BenefitItem {
+  const key = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `b${Date.now()}`;
+  return { key, icon: 'sparkles', title: '', body: '' };
+}
+
+export default function HomepageStudio({
+  initial,
+  creators,
+}: {
+  initial: HomepageSection[];
+  creators: PillCreator[];
+}) {
   const [sections, setSections] = useState<HomepageSection[]>(initial);
   const [saveState, setSaveState] = useState<SaveState>('idle');
   const dirty = useRef(false);
@@ -51,6 +70,31 @@ export default function HomepageStudio({ initial }: { initial: HomepageSection[]
 
   function patch(idx: number, change: Partial<HomepageSection>) {
     setSections((prev) => prev.map((s, i) => (i === idx ? { ...s, ...change } : s)));
+  }
+  /** Current benefit cards of a value_props section (materializing defaults). */
+  function itemsOf(s: HomepageSection): BenefitItem[] {
+    return s.items && s.items.length > 0 ? s.items : DEFAULT_BENEFITS;
+  }
+  function setItems(sIdx: number, next: BenefitItem[]) {
+    patch(sIdx, { items: next });
+  }
+  function patchItem(sIdx: number, iIdx: number, change: Partial<BenefitItem>) {
+    setSections((prev) =>
+      prev.map((s, i) => {
+        if (i !== sIdx) return s;
+        const items = (s.items && s.items.length > 0 ? s.items : DEFAULT_BENEFITS).map((it, j) =>
+          j === iIdx ? { ...it, ...change } : it,
+        );
+        return { ...s, items };
+      }),
+    );
+  }
+  function moveItem(sIdx: number, iIdx: number, dir: -1 | 1) {
+    const items = [...itemsOf(sections[sIdx])];
+    const j = iIdx + dir;
+    if (j < 0 || j >= items.length) return;
+    [items[iIdx], items[j]] = [items[j], items[iIdx]];
+    setItems(sIdx, items);
   }
   function move(idx: number, dir: -1 | 1) {
     setSections((prev) => {
@@ -179,12 +223,10 @@ export default function HomepageStudio({ initial }: { initial: HomepageSection[]
                   {meta.hasCopy && (
                     <div className="sm:col-span-2">
                       <label className="block text-[11px] font-semibold text-neutral-500 mb-1">טקסט משנה</label>
-                      <textarea
+                      <InlineRichField
                         value={s.subtitle ?? ''}
-                        onChange={(e) => patch(idx, { subtitle: e.target.value })}
+                        onChange={(v) => patch(idx, { subtitle: v })}
                         rows={2}
-                        placeholder="ברירת מחדל"
-                        className={inputCls}
                       />
                     </div>
                   )}
@@ -213,10 +255,151 @@ export default function HomepageStudio({ initial }: { initial: HomepageSection[]
                   )}
                 </div>
               )}
+
+              {meta.hasItems && (
+                <BenefitsEditor
+                  items={itemsOf(s)}
+                  onPatch={(iIdx, change) => patchItem(idx, iIdx, change)}
+                  onMove={(iIdx, dir) => moveItem(idx, iIdx, dir)}
+                  onRemove={(iIdx) => setItems(idx, itemsOf(s).filter((_, j) => j !== iIdx))}
+                  onAdd={() => setItems(idx, [...itemsOf(s), newBenefit()])}
+                />
+              )}
+
+              {s.type === 'featured_creators' && (
+                <CreatorsPreview creators={creators} limit={s.limit ?? 8} />
+              )}
             </li>
           );
         })}
       </ol>
+    </div>
+  );
+}
+
+/** Per-card editor for the value_props benefits, with a live homepage preview. */
+function BenefitsEditor({
+  items,
+  onPatch,
+  onMove,
+  onRemove,
+  onAdd,
+}: {
+  items: BenefitItem[];
+  onPatch: (iIdx: number, change: Partial<BenefitItem>) => void;
+  onMove: (iIdx: number, dir: -1 | 1) => void;
+  onRemove: (iIdx: number) => void;
+  onAdd: () => void;
+}) {
+  const MAX = 6;
+  return (
+    <div className="ps-7 mt-1 space-y-3">
+      <p className="text-[11px] font-semibold text-neutral-500">כרטיסי יתרונות</p>
+
+      {items.map((it, i) => (
+        <div key={it.key} className="rounded-xl border border-neutral-200 p-3">
+          <div className="flex items-start gap-3">
+            <IconPicker value={it.icon} onChange={(icon) => onPatch(i, { icon })} />
+            <div className="flex-1 min-w-0 space-y-2">
+              <input
+                value={it.title}
+                onChange={(e) => onPatch(i, { title: e.target.value })}
+                placeholder="כותרת הכרטיס"
+                className={`${inputCls} font-semibold`}
+              />
+              <InlineRichField
+                value={it.body}
+                onChange={(v) => onPatch(i, { body: v })}
+                rows={2}
+                placeholder="תיאור קצר…"
+              />
+            </div>
+            <div className="flex flex-col items-center gap-1 shrink-0">
+              <button type="button" onClick={() => onMove(i, -1)} disabled={i === 0} aria-label="העבר למעלה" className="p-1 text-neutral-400 hover:text-brand-purple-700 disabled:opacity-30">
+                <ArrowUp className="w-3.5 h-3.5" />
+              </button>
+              <button type="button" onClick={() => onMove(i, 1)} disabled={i === items.length - 1} aria-label="העבר למטה" className="p-1 text-neutral-400 hover:text-brand-purple-700 disabled:opacity-30">
+                <ArrowDown className="w-3.5 h-3.5" />
+              </button>
+              <button type="button" onClick={() => onRemove(i)} disabled={items.length <= 1} aria-label="מחק כרטיס" className="p-1 text-neutral-400 hover:text-red-600 disabled:opacity-30">
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        </div>
+      ))}
+
+      <button
+        type="button"
+        onClick={onAdd}
+        disabled={items.length >= MAX}
+        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-pill border border-neutral-300 text-xs font-semibold text-neutral-600 hover:border-brand-purple-400 hover:text-brand-purple-700 transition-colors disabled:opacity-40"
+      >
+        <Plus className="w-3.5 h-3.5" />
+        הוסף יתרון
+      </button>
+
+      <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-4">
+        <span className="block text-[11px] font-semibold text-neutral-500 mb-3">תצוגה מקדימה (כפי שמופיע בעמוד הבית)</span>
+        <ValueProps items={items} />
+      </div>
+    </div>
+  );
+}
+
+/** Grid of allowed lucide icons for a benefit card. */
+function IconPicker({ value, onChange }: { value: BenefitIconKey; onChange: (icon: BenefitIconKey) => void }) {
+  return (
+    <div className="grid grid-cols-4 gap-1 shrink-0" style={{ width: '8.5rem' }}>
+      {BENEFIT_ICON_KEYS.map((key) => {
+        const Icon = BENEFIT_ICONS[key];
+        const selected = key === value;
+        return (
+          <button
+            key={key}
+            type="button"
+            onClick={() => onChange(key)}
+            title={key}
+            aria-label={key}
+            aria-pressed={selected}
+            className={[
+              'inline-flex items-center justify-center w-7 h-7 rounded-md border transition-colors',
+              selected
+                ? 'border-brand-purple-400 bg-brand-purple-50 text-brand-purple-700'
+                : 'border-neutral-200 bg-white text-neutral-500 hover:border-brand-purple-300',
+            ].join(' ')}
+          >
+            <Icon className="w-3.5 h-3.5" />
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Faithful preview of the "Top Creators" pills — shows every active creator. */
+function CreatorsPreview({ creators, limit }: { creators: PillCreator[]; limit: number }) {
+  const shown = creators.slice(0, limit);
+  return (
+    <div className="ps-7 mt-1">
+      <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-4">
+        <span className="block text-[11px] font-semibold text-neutral-500 mb-3">
+          תצוגה מקדימה (כפי שמופיע בעמוד הבית)
+        </span>
+        {creators.length === 0 ? (
+          <p className="text-sm text-neutral-500">
+            אין יוצרים פעילים להצגה. צרו יוצרים והגדירו סטטוס &quot;פעיל&quot; בעמוד ניהול היוצרים.
+          </p>
+        ) : (
+          <>
+            <CreatorPills creators={shown} />
+            <p className="mt-3 text-[11px] text-neutral-400">
+              מוצגים {shown.length} מתוך {creators.length} יוצרים פעילים{' '}
+              {creators.length > limit ? '(הגדילו את "מספר פריטים" כדי להציג עוד)' : ''}
+            </p>
+          </>
+        )}
+      </div>
     </div>
   );
 }

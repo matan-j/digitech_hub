@@ -208,8 +208,12 @@ function IncludedCourseCard({ course: c, owned }: { course: BundleCourseRef; own
           כלול בחבילה
         </span>
         {dp.final && (
-          <span className="text-xs font-bold text-neutral-500">
-            בשווי <span className="text-neutral-900">{dp.final}</span>
+          <span className="inline-flex items-baseline gap-1.5 text-xs font-bold text-neutral-500">
+            בשווי
+            {dp.hasDiscount && dp.original && (
+              <span className="text-neutral-400 line-through">{dp.original}</span>
+            )}
+            <span className="text-neutral-900">{dp.final}</span>
           </span>
         )}
       </div>

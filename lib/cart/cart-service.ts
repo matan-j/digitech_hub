@@ -45,6 +45,8 @@ export type CartLine = {
 
 /** The coupon currently applied to the cart (validated, priced). */
 export type AppliedCoupon = {
+  /** Coupon row id — let checkout snapshot + record redemption without re-validating. */
+  id: string;
   code: string;
   /** Amount (ILS) the coupon takes off total_after. */
   discount: number;
@@ -146,7 +148,7 @@ export async function getCart(userId: string): Promise<CartSummary> {
       items.map((i) => ({ content_id: i.content_id, price_after: i.price_after })),
     );
     if (res.ok) {
-      coupon = { code: res.code, discount: res.discount, applies_to: res.applies_to };
+      coupon = { id: res.coupon_id, code: res.code, discount: res.discount, applies_to: res.applies_to };
       total_after_coupon = res.total_after_coupon;
       // Surface a 'specific' coupon's discount on the matching cart rows.
       for (const it of items) {

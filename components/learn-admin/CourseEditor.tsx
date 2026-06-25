@@ -117,7 +117,7 @@ export default function CourseEditor({ initialCourse }: { initialCourse: Course 
           <code className="text-xs font-mono text-gray-400 hidden sm:inline">{course.slug}</code>
         </div>
         <div className="flex items-center gap-2">
-          <SaveIndicator state={saveState} onForceSave={() => void saveNow(course)} />
+          <SaveIndicator state={saveState} onForceSave={() => void saveNow(course)} initialSavedAt={course.lastUpdated} />
           <Link
             href={`/learn/courses/${course.slug}`}
             target="_blank"

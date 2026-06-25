@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { useAccessGate } from '@/components/auth/AccessModalProvider';
 import { useContactInfo } from '@/components/auth/ContactInfoProvider';
+import RedirectingOverlay from '@/components/checkout/RedirectingOverlay';
 import type { ContentType } from '@/lib/payments/order-service';
 
 /**
@@ -51,6 +52,9 @@ export default function AccessActionButton({
   const { requireContactInfo } = useContactInfo();
   const router = useRouter();
   const [busy, setBusy] = useState(false);
+  // Distinct from `busy`: true only while we wait for the paid payment link, so the
+  // full-screen "redirecting to payment" overlay shows for the paid flow alone.
+  const [redirecting, setRedirecting] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
   // Already-accessible content → a plain link, no gate, no JS round-trip.
@@ -96,6 +100,7 @@ export default function AccessActionButton({
 
   async function startPurchase() {
     setBusy(true);
+    setRedirecting(true); // show the "opening payment" overlay while the link is built
     setErr(null);
     try {
       const res = await fetch('/api/purchase', {
@@ -105,7 +110,7 @@ export default function AccessActionButton({
       });
       const d = await res.json().catch(() => ({}));
       if (res.ok && d?.status === 'redirect' && typeof d?.url === 'string') {
-        // paid → SUMIT hosted checkout (external). Full-page navigation.
+        // paid → external hosted checkout. Keep the overlay up through navigation.
         window.location.assign(d.url as string);
         return;
       }
@@ -114,6 +119,7 @@ export default function AccessActionButton({
         router.push(d.redirect);
         return;
       }
+      setRedirecting(false);
       if (res.status === 400 && d?.error === 'phone_required') {
         // Should be covered by the gate above; re-prompt as a safety net.
         setBusy(false);
@@ -130,6 +136,7 @@ export default function AccessActionButton({
       setErr('שגיאה בביצוע הרכישה. נסו שוב.');
       setBusy(false);
     } catch {
+      setRedirecting(false);
       setErr('שגיאת רשת.');
       setBusy(false);
     }
@@ -162,6 +169,7 @@ export default function AccessActionButton({
         {label}
       </button>
       {err && <span className={errorClassName}>{err}</span>}
+      <RedirectingOverlay show={redirecting} />
     </span>
   );
 }

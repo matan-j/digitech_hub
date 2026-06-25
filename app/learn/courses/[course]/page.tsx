@@ -221,7 +221,7 @@ export default async function CourseLanding({ params }: { params: Promise<{ cour
         {flatLessons.length === 0 ? (
           <div className="p-12 text-center text-neutral-500 text-sm">אין שיעורים בקורס זה.</div>
         ) : hasOnlyDefaultModule ? (
-          <LessonList lessons={course.modules[0].lessons} slug={slug} locked={locked || !!course.modules[0].is_locked} completed={completed} />
+          <LessonList lessons={course.modules[0].lessons} slug={slug} courseLocked={locked} hardLocked={!!course.modules[0].is_locked} completed={completed} />
         ) : (
           <div className="divide-y divide-neutral-100">
             {course.modules.map((m) => (
@@ -229,7 +229,7 @@ export default async function CourseLanding({ params }: { params: Promise<{ cour
                 key={m.id}
                 module={m}
                 slug={slug}
-                locked={locked}
+                courseLocked={locked}
                 completed={completed}
               />
             ))}
@@ -243,12 +243,14 @@ export default async function CourseLanding({ params }: { params: Promise<{ cour
 function ModuleSection({
   module: m,
   slug,
-  locked,
+  courseLocked,
   completed,
 }: {
   module: ModuleWithChildren;
   slug: string;
-  locked: boolean;
+  /** The course-level access gate (no purchase/login/subscription). A manually
+   *  unlocked (is_preview) lesson is reachable despite this; a hard lock is not. */
+  courseLocked: boolean;
   completed: Set<string>;
 }) {
   // Hard-locked module (migration 031): blocked for everyone, cascading to every
@@ -274,7 +276,7 @@ function ModuleSection({
         <div className="space-y-3">
           {m.chapters.map((c) => {
             // Hard-locked chapter (migration 029) — or inherited from a locked
-            // module. Blocked for everyone, even with course access.
+            // module. Blocked for everyone, even with course access / preview.
             const chapterLocked = moduleLocked || !!c.is_locked;
             return (
               <div key={c.id}>
@@ -285,7 +287,7 @@ function ModuleSection({
                   </h4>
                   {chapterLocked && <Lock className="w-3.5 h-3.5 text-neutral-400" aria-label="פרק נעול" />}
                 </div>
-                <LessonList lessons={c.lessons} slug={slug} locked={locked || chapterLocked} completed={completed} compact />
+                <LessonList lessons={c.lessons} slug={slug} courseLocked={courseLocked} hardLocked={chapterLocked} completed={completed} compact />
               </div>
             );
           })}
@@ -294,7 +296,7 @@ function ModuleSection({
 
       {m.lessons.length > 0 && (
         <div className={m.chapters.length > 0 ? 'mt-3' : ''}>
-          <LessonList lessons={m.lessons} slug={slug} locked={locked || moduleLocked} completed={completed} compact />
+          <LessonList lessons={m.lessons} slug={slug} courseLocked={courseLocked} hardLocked={moduleLocked} completed={completed} compact />
         </div>
       )}
     </div>
@@ -304,13 +306,17 @@ function ModuleSection({
 function LessonList({
   lessons,
   slug,
-  locked,
+  courseLocked,
+  hardLocked,
   completed,
   compact = false,
 }: {
   lessons: DbLesson[];
   slug: string;
-  locked: boolean;
+  /** Course-level access gate — lifted for a manually-unlocked (is_preview) lesson. */
+  courseLocked: boolean;
+  /** Structural hard lock from the module/chapter (migration 029/031) — overrides preview. */
+  hardLocked: boolean;
   completed: Set<string>;
   compact?: boolean;
 }) {
@@ -318,9 +324,18 @@ function LessonList({
     <ul className={compact ? 'rounded-md border border-neutral-100 overflow-hidden' : ''}>
       {lessons.map((l) => {
         const isDone = completed.has(l.id);
-        // Effective lock: course/module/chapter lock (passed in) OR this single
-        // lesson's own hard lock (migration 031).
-        const lessonLocked = locked || !!l.is_locked;
+        // Access hierarchy (matches the lesson page + decideAccess):
+        //   1. Course access (purchase / subscription / login) → everything open.
+        //   2. A manually unlocked lesson (is_preview) → open even without access.
+        //   3. Otherwise → locked.
+        // A structural HARD lock (module/chapter/this lesson, migration 029/031)
+        // always wins and is never lifted by preview.
+        const previewOpen = !!l.is_preview;
+        const structurallyLocked = hardLocked || !!l.is_locked;
+        const lessonLocked = structurallyLocked || (courseLocked && !previewOpen);
+        // Open to a non-buyer purely because it was manually unlocked — flag it so
+        // the visitor understands why this one lesson is reachable.
+        const freePreview = courseLocked && previewOpen && !structurallyLocked;
         // Locked lessons send the viewer back to the course header, where the
         // access-aware CTA (enroll / purchase / subscribe) lives.
         const url = lessonLocked ? `/learn/courses/${slug}` : `/learn/courses/${slug}/${l.slug}`;
@@ -342,6 +357,11 @@ function LessonList({
                 <p className="font-semibold text-neutral-900 text-sm truncate">{l.title}</p>
                 {l.duration && <p className="text-xs text-neutral-500 mt-0.5">{l.duration}</p>}
               </div>
+              {freePreview && (
+                <span className="text-[11px] font-bold text-brand-purple-700 bg-brand-purple-50 rounded-pill px-2 py-0.5 shrink-0">
+                  צפייה חופשית
+                </span>
+              )}
               {lessonLocked ? (
                 <Lock className="w-4 h-4 text-neutral-400" />
               ) : (
