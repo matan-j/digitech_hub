@@ -7,18 +7,17 @@ import GuideCard from './GuideCard';
 import CreatorCard from './CreatorCard';
 import PlaylistCard from './PlaylistCard';
 import EmptyState from './EmptyState';
+import { DOMAINS, type DomainId, domainBadgeClasses, domainDotClasses } from '@/lib/learn/domains';
 import type { ContentItem, Creator, Playlist } from '@/lib/learn/types';
 
 export type HubCreator = { creator: Creator; guides: number; playlists: number };
 export type HubPlaylist = { playlist: Playlist; count: number };
-export type HubCategory = { id: string; name: string };
 
 type Props = {
   featuredGuides: ContentItem[];
   creators: HubCreator[];
   playlists: HubPlaylist[];
   guides: ContentItem[];
-  categories: HubCategory[];
 };
 
 function SectionHeader({
@@ -46,29 +45,37 @@ function SectionHeader({
   );
 }
 
-export default function GuidesHub({ featuredGuides, creators, playlists, guides, categories }: Props) {
+export default function GuidesHub({ featuredGuides, creators, playlists, guides }: Props) {
   const [query, setQuery] = useState('');
-  const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [activeDomain, setActiveDomain] = useState<DomainId | null>(null);
 
-  const isSearching = query.trim().length > 0 || activeCategory !== null;
+  const isSearching = query.trim().length > 0 || activeDomain !== null;
+
+  // Domains present among the published guides — only these get a filter pill.
+  const domainCounts = useMemo(() => {
+    const map = new Map<DomainId, number>();
+    for (const g of guides) {
+      if (g.domain) map.set(g.domain, (map.get(g.domain) ?? 0) + 1);
+    }
+    return map;
+  }, [guides]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return guides.filter((g) => {
-      if (activeCategory && !(g.categories ?? []).some((c) => c.id === activeCategory)) return false;
+      if (activeDomain && g.domain !== activeDomain) return false;
       if (!q) return true;
       const hay = [
         g.title,
         g.tagline ?? '',
         g.description ?? '',
         g.creator?.name ?? '',
-        ...(g.categories ?? []).map((c) => c.name),
       ]
         .join(' ')
         .toLowerCase();
       return hay.includes(q);
     });
-  }, [guides, query, activeCategory]);
+  }, [guides, query, activeDomain]);
 
   return (
     <div className="space-y-12">
@@ -79,7 +86,7 @@ export default function GuidesHub({ featuredGuides, creators, playlists, guides,
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="חיפוש לפי כותרת, יוצר, קטגוריה…"
+            placeholder="חיפוש לפי כותרת, יוצר, תיאור…"
             className="w-full ps-10 pe-10 py-2.5 rounded-input border border-neutral-300 bg-white text-sm focus:outline-none focus:border-brand-purple-500"
           />
           {query && (
@@ -94,35 +101,40 @@ export default function GuidesHub({ featuredGuides, creators, playlists, guides,
           )}
         </div>
 
-        {categories.length > 0 && (
+        {domainCounts.size > 0 && (
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              onClick={() => setActiveCategory(null)}
+              onClick={() => setActiveDomain(null)}
               className={[
                 'px-3 py-1.5 rounded-pill text-xs font-semibold border transition-colors',
-                activeCategory === null
+                activeDomain === null
                   ? 'bg-brand-purple-700 text-white border-brand-purple-700'
                   : 'bg-white text-neutral-600 border-neutral-300 hover:border-brand-purple-400',
               ].join(' ')}
             >
               הכל
             </button>
-            {categories.map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                onClick={() => setActiveCategory((prev) => (prev === c.id ? null : c.id))}
-                className={[
-                  'px-3 py-1.5 rounded-pill text-xs font-semibold border transition-colors',
-                  activeCategory === c.id
-                    ? 'bg-brand-purple-700 text-white border-brand-purple-700'
-                    : 'bg-white text-neutral-600 border-neutral-300 hover:border-brand-purple-400',
-                ].join(' ')}
-              >
-                {c.name}
-              </button>
-            ))}
+            {DOMAINS.map((d) => {
+              const count = domainCounts.get(d.id) ?? 0;
+              if (count === 0) return null;
+              const active = activeDomain === d.id;
+              return (
+                <button
+                  key={d.id}
+                  type="button"
+                  onClick={() => setActiveDomain((prev) => (prev === d.id ? null : d.id))}
+                  className={[
+                    'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-pill text-xs font-semibold border transition-colors',
+                    active ? domainBadgeClasses(d.id) : 'bg-white text-neutral-600 border-neutral-300 hover:border-brand-purple-400',
+                  ].join(' ')}
+                >
+                  <span className={['w-1.5 h-1.5 rounded-pill', domainDotClasses(d.id)].join(' ')} aria-hidden />
+                  {d.label}
+                  <span className="text-[10px] opacity-80">({count})</span>
+                </button>
+              );
+            })}
           </div>
         )}
       </div>
@@ -134,7 +146,7 @@ export default function GuidesHub({ featuredGuides, creators, playlists, guides,
             <EmptyState
               icon={FileSearch}
               title="לא נמצאו תוצאות"
-              message="נסה מילות חיפוש אחרות או בחר קטגוריה אחרת."
+              message="נסה מילות חיפוש אחרות או בחר תחום אחר."
             />
           ) : (
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">

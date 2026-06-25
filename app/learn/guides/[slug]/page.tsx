@@ -133,11 +133,6 @@ export default async function GuideReadPage({ params }: { params: Promise<{ slug
               {domainMeta.label}
             </span>
           )}
-          {(guide.categories ?? []).map((c) => (
-            <span key={c.id} className="inline-block px-2.5 py-1 rounded-pill text-[11px] font-medium bg-neutral-100 text-neutral-700">
-              {c.name}
-            </span>
-          ))}
           {guide.duration_minutes ? (
             <span className="inline-flex items-center gap-1 text-[11px] font-medium text-neutral-500">
               <Clock className="w-3 h-3" />

@@ -6,7 +6,6 @@ import { Trash2, ExternalLink } from 'lucide-react';
 import FileUpload from './FileUpload';
 import SaveIndicator, { type SaveState } from './SaveIndicator';
 import YouTubeField from './YouTubeField';
-import CategoriesPicker from './CategoriesPicker';
 import AccessControlFields from './AccessControlFields';
 import { DOMAINS, type DomainId, isDomainId } from '@/lib/learn/domains';
 import type { AccessLevel, CatalogVisibility, Playbook } from '@/lib/learn/types';
@@ -22,9 +21,6 @@ export default function PlaybookEditor({ initial }: Props) {
   const [coverUrl, setCoverUrl] = useState(initial.cover_url ?? '');
   const [videoUrl, setVideoUrl] = useState(initial.video_url ?? '');
   const [domain, setDomain] = useState<DomainId | null>(initial.domain ?? null);
-  const [categoryIds, setCategoryIds] = useState<string[]>(
-    (initial.categories ?? []).map((c) => c.id),
-  );
   const [isPremium, setIsPremium] = useState(initial.is_premium);
   const [status, setStatus] = useState(initial.status);
   const [htmlContent, setHtmlContent] = useState(initial.html_content ?? '');
@@ -70,7 +66,6 @@ export default function PlaybookEditor({ initial }: Props) {
       cover_url: coverUrl || null,
       video_url: videoUrl || null,
       domain,
-      category_ids: categoryIds,
       is_premium: isPremium,
       html_content: htmlContent,
       access_level: accessLevel,
@@ -91,7 +86,7 @@ export default function PlaybookEditor({ initial }: Props) {
       persist(buildPayload());
     }, 1200);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [title, tagline, description, audience, coverUrl, videoUrl, domain, categoryIds, isPremium, htmlContent, accessLevel, catalogVisibility, previewEnabled]);
+  }, [title, tagline, description, audience, coverUrl, videoUrl, domain, isPremium, htmlContent, accessLevel, catalogVisibility, previewEnabled]);
 
   useEffect(() => () => {
     if (saveTimer.current) clearTimeout(saveTimer.current);
@@ -221,33 +216,22 @@ export default function PlaybookEditor({ initial }: Props) {
 
       <section className="bg-white rounded-2xl border border-neutral-200 p-5">
         <h2 className="text-sm font-extrabold text-neutral-700 uppercase tracking-wide mb-3">סיווג</h2>
-        <div className="grid sm:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-xs font-semibold text-neutral-600 mb-1.5">תחום</label>
-            <select
-              value={domain ?? ''}
-              onChange={(e) => {
-                const v = e.target.value;
-                if (v === '') {
-                  setDomain(null);
-                  setCategoryIds([]);
-                } else if (isDomainId(v)) {
-                  setDomain(v);
-                  setCategoryIds([]);
-                }
-              }}
-              className="w-full px-3 py-2 rounded-md border border-neutral-200 focus:border-brand-purple-400 focus:outline-none text-sm bg-white"
-            >
-              <option value="">— ללא תחום —</option>
-              {DOMAINS.map((d) => (
-                <option key={d.id} value={d.id}>{d.label}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-neutral-600 mb-1.5">קטגוריות</label>
-            <CategoriesPicker domain={domain} value={categoryIds} onChange={setCategoryIds} />
-          </div>
+        <div>
+          <label className="block text-xs font-semibold text-neutral-600 mb-1.5">תחום</label>
+          <select
+            value={domain ?? ''}
+            onChange={(e) => {
+              const v = e.target.value;
+              if (v === '') setDomain(null);
+              else if (isDomainId(v)) setDomain(v);
+            }}
+            className="w-full sm:max-w-xs px-3 py-2 rounded-md border border-neutral-200 focus:border-brand-purple-400 focus:outline-none text-sm bg-white"
+          >
+            <option value="">— ללא תחום —</option>
+            {DOMAINS.map((d) => (
+              <option key={d.id} value={d.id}>{d.label}</option>
+            ))}
+          </select>
         </div>
       </section>
 

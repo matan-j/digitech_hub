@@ -20,7 +20,6 @@ export default async function PlaybooksLearnerIndex() {
     cover_url: p.cover_url,
     video_url: p.video_url,
     domain: p.domain,
-    categories: p.categories ?? [],
     locked: p.is_premium && !canSeePremium,
   }));
 

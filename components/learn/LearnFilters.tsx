@@ -4,7 +4,6 @@ import { useMemo, useState } from 'react';
 import { Search, X } from 'lucide-react';
 import { DOMAINS, type DomainId, domainBadgeClasses, domainDotClasses } from '@/lib/learn/domains';
 import LearnCard from './LearnCard';
-import type { CategoryRef } from '@/lib/learn/types';
 
 export type FilterableItem = {
   id: string;
@@ -14,7 +13,6 @@ export type FilterableItem = {
   cover_url: string | null;
   video_url: string | null;
   domain: DomainId | null;
-  categories: CategoryRef[];
   locked: boolean;
 };
 
@@ -126,7 +124,6 @@ export default function LearnFilters({ items, variant, emptyText = 'אין פר�
               coverUrl={it.cover_url}
               videoUrl={it.video_url}
               domain={it.domain}
-              categories={it.categories}
               locked={it.locked}
             />
           ))}

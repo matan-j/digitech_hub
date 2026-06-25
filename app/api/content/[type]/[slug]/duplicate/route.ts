@@ -84,7 +84,14 @@ export async function POST(
 
   // Deep-copy modules → chapters → lessons → resources
   for (const mod of source.modules) {
-    const { id: oldModId, course_id: _cid, ...modRest } = mod as typeof mod & { course_id: string };
+    // Strip nested children (chapters/lessons/resources) + id/course_id: they are
+    // enriched in-memory shapes, NOT columns on `modules`. Leaving them in the spread
+    // makes Supabase reject the insert on unknown columns, silently skipping the module.
+    const {
+      id: oldModId, course_id: _cid,
+      chapters: _modChapters, lessons: _modLessons, resources: _modResources,
+      ...modRest
+    } = mod as typeof mod & { course_id: string };
 
     const { data: newMod, error: modErr } = await supabase
       .from('modules')
@@ -110,7 +117,13 @@ export async function POST(
 
     // Copy chapters
     for (const ch of mod.chapters ?? []) {
-      const { id: oldChId, module_id: _mid, ...chRest } = ch as typeof ch & { module_id: string };
+      // Same as modules: drop nested lessons/resources so the chapters insert only
+      // carries real columns.
+      const {
+        id: oldChId, module_id: _mid,
+        lessons: _chLessons, resources: _chResources,
+        ...chRest
+      } = ch as typeof ch & { module_id: string };
 
       const { data: newCh, error: chErr } = await supabase
         .from('chapters')

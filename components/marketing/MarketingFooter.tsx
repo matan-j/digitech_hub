@@ -13,7 +13,6 @@ const COLS: { title: string; links: { label: string; href: string }[] }[] = [
   {
     title: 'מועדון',
     links: [
-      { label: 'מחירים', href: '/pricing' },
       { label: 'אזור הלמידה', href: '/learn' },
       { label: 'התחברות', href: '/login' },
     ],

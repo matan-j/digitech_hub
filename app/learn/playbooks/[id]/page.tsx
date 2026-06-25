@@ -98,11 +98,6 @@ export default async function PlaybookViewer({ params }: { params: Promise<{ id:
                 {domainMeta.label}
               </span>
             )}
-            {(playbook.categories ?? []).map((c) => (
-              <span key={c.id} className="inline-block px-2.5 py-1 rounded-pill text-[11px] font-medium bg-neutral-100 text-neutral-700">
-                {c.name}
-              </span>
-            ))}
             {isAdmin && playbook.status !== 'published' && (
               <span className="inline-block px-2.5 py-1 rounded-pill text-[11px] font-bold bg-amber-100 text-amber-900">
                 טיוטה (לא פורסם)

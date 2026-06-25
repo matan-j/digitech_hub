@@ -2,7 +2,6 @@ import Link from 'next/link';
 import { Compass, BookText, Lock, Play } from 'lucide-react';
 import { DOMAIN_BY_ID, domainBadgeClasses, type DomainId } from '@/lib/learn/domains';
 import { youtubeIdFromUrl, youtubeThumbnailUrl } from '@/lib/learn/youtube';
-import type { CategoryRef } from '@/lib/learn/types';
 
 type Props = {
   href: string;
@@ -12,7 +11,6 @@ type Props = {
   coverUrl: string | null;
   videoUrl: string | null;
   domain: DomainId | null;
-  categories: CategoryRef[];
   locked?: boolean;
 };
 
@@ -24,7 +22,6 @@ export default function LearnCard({
   coverUrl,
   videoUrl,
   domain,
-  categories,
   locked,
 }: Props) {
   const ytId = youtubeIdFromUrl(videoUrl);
@@ -79,24 +76,6 @@ export default function LearnCard({
           {title}
         </h3>
         {tagline && <p className="text-sm text-neutral-500 line-clamp-2">{tagline}</p>}
-
-        {categories.length > 0 && (
-          <div className="flex flex-wrap gap-1 mt-3">
-            {categories.slice(0, 3).map((c) => (
-              <span
-                key={c.id}
-                className="inline-block px-2 py-0.5 rounded-pill text-[10px] font-medium bg-neutral-100 text-neutral-600"
-              >
-                {c.name}
-              </span>
-            ))}
-            {categories.length > 3 && (
-              <span className="inline-block px-2 py-0.5 rounded-pill text-[10px] font-medium bg-neutral-50 text-neutral-400">
-                +{categories.length - 3}
-              </span>
-            )}
-          </div>
-        )}
       </div>
     </Link>
   );

@@ -9,7 +9,6 @@ import BlockEditor from './BlockEditor';
 import SaveIndicator, { type SaveState } from './SaveIndicator';
 import YouTubeField from './YouTubeField';
 import VimeoField from './VimeoField';
-import CategoriesPicker from './CategoriesPicker';
 import AccessControlFields from './AccessControlFields';
 import { DOMAINS, type DomainId, isDomainId } from '@/lib/learn/domains';
 import { GUIDE_CONTENT_KINDS, type AccessLevel, type CatalogVisibility, type GuideBlock, type GuideContentKind, type GuideItem } from '@/lib/learn/types';
@@ -35,7 +34,6 @@ export default function GuideEditor({ initial, mode = 'admin', creators = [], ba
   const [audience, setAudience] = useState(initial.audience ?? '');
   const [coverUrl, setCoverUrl] = useState(initial.cover_url ?? '');
   const [domain, setDomain] = useState<DomainId | null>(initial.domain ?? null);
-  const [categoryIds, setCategoryIds] = useState<string[]>((initial.categories ?? []).map((c) => c.id));
   const [isPremium, setIsPremium] = useState(initial.is_premium);
   const [status, setStatus] = useState(initial.status);
   const [blocks, setBlocks] = useState<GuideBlock[]>(initial.body ?? []);
@@ -76,7 +74,6 @@ export default function GuideEditor({ initial, mode = 'admin', creators = [], ba
       audience: audience || null,
       cover_url: coverUrl || null,
       domain,
-      category_ids: categoryIds,
       is_premium: isPremium,
       body: blocks,
       content_kind: contentKind,
@@ -97,7 +94,7 @@ export default function GuideEditor({ initial, mode = 'admin', creators = [], ba
       base.is_featured = isFeatured;
     }
     return { ...base, ...extra };
-  }, [title, tagline, description, audience, coverUrl, domain, categoryIds, isPremium, blocks, contentKind, contentUrl, duration, seoTitle, seoDescription, ogImageUrl, creatorId, isFeatured, accessLevel, catalogVisibility, previewEnabled, priceAmount, priceCurrency, mode]);
+  }, [title, tagline, description, audience, coverUrl, domain, isPremium, blocks, contentKind, contentUrl, duration, seoTitle, seoDescription, ogImageUrl, creatorId, isFeatured, accessLevel, catalogVisibility, previewEnabled, priceAmount, priceCurrency, mode]);
 
   const persist = useCallback(async (payload: Record<string, unknown>) => {
     setSaveState('saving');
@@ -138,7 +135,7 @@ export default function GuideEditor({ initial, mode = 'admin', creators = [], ba
       persist(buildPayload());
     }, 1200);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [title, tagline, description, audience, coverUrl, domain, categoryIds, isPremium, blocks, contentKind, contentUrl, duration, seoTitle, seoDescription, ogImageUrl, creatorId, isFeatured, accessLevel, catalogVisibility, previewEnabled, priceAmount, priceCurrency]);
+  }, [title, tagline, description, audience, coverUrl, domain, isPremium, blocks, contentKind, contentUrl, duration, seoTitle, seoDescription, ogImageUrl, creatorId, isFeatured, accessLevel, catalogVisibility, previewEnabled, priceAmount, priceCurrency]);
 
   useEffect(() => () => {
     if (saveTimer.current) clearTimeout(saveTimer.current);
@@ -386,8 +383,8 @@ export default function GuideEditor({ initial, mode = 'admin', creators = [], ba
                 value={domain ?? ''}
                 onChange={(e) => {
                   const v = e.target.value;
-                  if (v === '') { setDomain(null); setCategoryIds([]); }
-                  else if (isDomainId(v)) { setDomain(v); setCategoryIds([]); }
+                  if (v === '') setDomain(null);
+                  else if (isDomainId(v)) setDomain(v);
                 }}
                 className="w-full px-3 py-2 rounded-md border border-neutral-200 focus:border-brand-purple-400 focus:outline-none text-sm bg-white"
               >
@@ -407,10 +404,6 @@ export default function GuideEditor({ initial, mode = 'admin', creators = [], ba
               />
             </div>
           </div>
-        </div>
-        <div className="mt-4">
-          <label className="block text-xs font-semibold text-neutral-600 mb-1.5">קטגוריות</label>
-          <CategoriesPicker domain={domain} value={categoryIds} onChange={setCategoryIds} />
         </div>
         {mode === 'admin' && (
           <div className="mt-4">

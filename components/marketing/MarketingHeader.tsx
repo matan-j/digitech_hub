@@ -5,7 +5,6 @@ const NAV = [
   { label: 'הדרכות', href: '/learn/guides' },
   { label: 'יוצרים', href: '/learn/creators' },
   { label: 'פלייליסטים', href: '/learn/playlists' },
-  { label: 'מחירים', href: '/pricing' },
 ];
 
 /**

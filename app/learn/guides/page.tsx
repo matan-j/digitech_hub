@@ -7,7 +7,7 @@ import {
   getCreatorStats,
   getPlaylistItemCounts,
 } from '@/lib/learn/db';
-import GuidesHub, { type HubCreator, type HubPlaylist, type HubCategory } from '@/components/learn/GuidesHub';
+import GuidesHub, { type HubCreator, type HubPlaylist } from '@/components/learn/GuidesHub';
 
 export const metadata = { title: 'הדרכות · DigiTech HUB' };
 export const dynamic = 'force-dynamic';
@@ -35,15 +35,6 @@ export default async function GuidesIndex() {
     count: playlistCounts[playlist.id] ?? 0,
   }));
 
-  // Categories used by published guides (for the filter row).
-  const catMap = new Map<string, HubCategory>();
-  for (const g of guides) {
-    for (const c of g.categories ?? []) {
-      if (!catMap.has(c.id)) catMap.set(c.id, { id: c.id, name: c.name });
-    }
-  }
-  const categories = Array.from(catMap.values());
-
   return (
     <div className="px-4 sm:px-6 lg:px-10 py-6 lg:py-10 max-w-6xl mx-auto">
       <header className="mb-8">
@@ -60,7 +51,6 @@ export default async function GuidesIndex() {
         creators={creatorCards}
         playlists={playlistCards}
         guides={guides}
-        categories={categories}
       />
     </div>
   );

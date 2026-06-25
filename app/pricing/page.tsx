@@ -12,18 +12,18 @@ export const metadata = {
   description: 'התחילו ללמוד בחינם, או הצטרפו למועדון לגישה מלאה.',
 };
 
-const FREE_PERKS = [
-  'עיון בכל הקורסים, ההדרכות והיוצרים',
-  'דפי קורס מלאים: סילבוס, תוצרי למידה ותצוגה מקדימה',
-  'הדרכות ופלייבוקים פתוחים לקריאה',
-];
-
 const CLUB_PERKS = [
+  'עיון חופשי בכל הקורסים, ההדרכות והיוצרים — בלי הרשמה',
   'גישה מלאה לכל שיעורי הקורסים',
   'מעקב התקדמות ושמירת מקום',
   'חומרי עבודה וקבצים להורדה',
-  'פלייבוקים אינטראקטיביים',
-  'תכנים חדשים מדי שבוע',
+  'פלייבוקים אינטראקטיביים ותכנים חדשים מדי שבוע',
+];
+
+const APP_PERKS = [
+  'גישה מלאה דרך אפליקציית דיגיטק',
+  'למידה מהנייד — בכל מקום ובכל זמן',
+  'כל התכנים והעדכונים החדשים',
 ];
 
 export default async function PricingPage() {
@@ -46,31 +46,7 @@ export default async function PricingPage() {
       </section>
 
       <section className="max-w-4xl mx-auto px-4 sm:px-6 pb-8 grid gap-5 md:grid-cols-2">
-        {/* Free */}
-        <div className="bg-white rounded-panel border border-neutral-200 p-8 flex flex-col" style={{ boxShadow: 'var(--shadow-card)' }}>
-          <h2 className="text-xl font-extrabold text-neutral-950">התחלה חופשית</h2>
-          <p className="mt-1 text-sm text-neutral-500">גילוי ולמידה ראשונית</p>
-          <div className="mt-5 mb-6">
-            <span className="text-4xl font-extrabold text-neutral-950">₪0</span>
-            <span className="text-sm text-neutral-500 me-1">לתמיד</span>
-          </div>
-          <ul className="space-y-3 flex-1">
-            {FREE_PERKS.map((p) => (
-              <li key={p} className="flex items-start gap-2.5 text-sm text-neutral-700">
-                <Check className="w-4 h-4 text-brand-purple-600 mt-0.5 shrink-0" />
-                {p}
-              </li>
-            ))}
-          </ul>
-          <Link
-            href="/learn"
-            className="mt-7 inline-flex items-center justify-center gap-2 px-5 py-3 rounded-pill border border-neutral-300 hover:border-brand-purple-400 text-neutral-800 text-sm font-bold transition-colors"
-          >
-            כניסה חופשית
-          </Link>
-        </div>
-
-        {/* Club */}
+        {/* Club — free start + membership in one path */}
         <div
           className="rounded-panel p-8 flex flex-col text-white relative overflow-hidden"
           style={{ backgroundImage: 'linear-gradient(150deg, #2E1A5C 0%, #4A2E8F 65%, #5B3AAE 100%)', boxShadow: 'var(--shadow-elevated)' }}
@@ -79,7 +55,7 @@ export default async function PricingPage() {
             הכי משתלם
           </span>
           <h2 className="text-xl font-extrabold">מועדון דיגיטק</h2>
-          <p className="mt-1 text-sm text-brand-purple-200">גישה מלאה לכל התוכן</p>
+          <p className="mt-1 text-sm text-brand-purple-200">מתחילים בחינם — מצטרפים לגישה מלאה</p>
           <div className="mt-5 mb-6">
             <span className="text-4xl font-extrabold">גישה מלאה</span>
           </div>
@@ -98,6 +74,33 @@ export default async function PricingPage() {
           >
             הצטרפות למועדון
             <ArrowLeft className="w-4 h-4" />
+          </Link>
+          <Link href="/learn" className="mt-3 text-center text-sm font-semibold text-brand-purple-200 hover:text-white transition-colors">
+            או התחילו בחינם, בלי הרשמה
+          </Link>
+        </div>
+
+        {/* App subscription */}
+        <div className="bg-white rounded-panel border border-neutral-200 p-8 flex flex-col" style={{ boxShadow: 'var(--shadow-card)' }}>
+          <h2 className="text-xl font-extrabold text-neutral-950">מנוי באפליקציית דיגיטק</h2>
+          <p className="mt-1 text-sm text-neutral-500">למידה מהנייד, בכל מקום</p>
+          <div className="mt-5 mb-6">
+            <span className="text-4xl font-extrabold text-neutral-950">₪99</span>
+            <span className="text-sm text-neutral-500 me-1">לחודש</span>
+          </div>
+          <ul className="space-y-3 flex-1">
+            {APP_PERKS.map((p) => (
+              <li key={p} className="flex items-start gap-2.5 text-sm text-neutral-700">
+                <Check className="w-4 h-4 text-brand-purple-600 mt-0.5 shrink-0" />
+                {p}
+              </li>
+            ))}
+          </ul>
+          <Link
+            href="#"
+            className="mt-7 inline-flex items-center justify-center gap-2 px-5 py-3 rounded-pill border border-neutral-300 hover:border-brand-purple-400 text-neutral-800 text-sm font-bold transition-colors"
+          >
+            הצטרפות למנוי
           </Link>
         </div>
       </section>

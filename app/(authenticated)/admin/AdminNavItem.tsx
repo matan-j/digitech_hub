@@ -11,7 +11,7 @@ const NAV = [
   { href: '/admin/guides', label: 'הדרכות', Icon: Compass, exact: false },
   { href: '/admin/playbooks', label: 'פלייבוקים', Icon: BookText, exact: false },
   { href: '/admin/products', label: 'מוצרים', Icon: Package, exact: false },
-  { href: '/admin/taxonomy', label: 'תחומים וקטגוריות', Icon: Tags, exact: false },
+  { href: '/admin/taxonomy', label: 'תחומים', Icon: Tags, exact: false },
   { href: '/admin/users', label: 'משתמשים', Icon: Users, exact: false },
   { href: '/admin/purchases', label: 'רכישות', Icon: ShoppingBag, exact: false },
   { href: '/admin/coupons', label: 'קופונים', Icon: Ticket, exact: false },
