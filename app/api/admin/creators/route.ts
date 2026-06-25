@@ -1,16 +1,8 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
-
-function slugify(input: string): string {
-  return input
-    .normalize('NFKD')
-    .toLowerCase()
-    .replace(/[֐-׿]/g, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 60);
-}
+import { toSlug, ensureUniqueSlug } from '@/lib/utils/slug';
+import { translateToSlug } from '@/lib/ai/slug-translate';
 
 const SOCIAL_FIELDS = ['website', 'linkedin', 'instagram', 'youtube', 'tiktok', 'email', 'contact_email'] as const;
 
@@ -20,20 +12,19 @@ export async function POST(request: Request) {
   const name = (body.name ?? '').toString().trim();
   if (!name) return NextResponse.json({ error: 'name_required' }, { status: 400 });
 
-  const slugBase = (body.slug ?? '').toString().trim() || slugify(name) || `creator-${Date.now()}`;
+  const provided = (body.slug ?? '').toString().trim();
+  const slugBase = (provided ? toSlug(provided) : await translateToSlug(name)) || `creator-${Date.now()}`;
 
   const supabase = await createClient();
 
   // De-dup slug
-  let slug = slugBase;
-  for (let n = 2; n < 50; n++) {
+  const slug = await ensureUniqueSlug(slugBase, async (c) => {
     const { count } = await supabase
       .from('creators')
       .select('id', { count: 'exact', head: true })
-      .eq('slug', slug);
-    if ((count ?? 0) === 0) break;
-    slug = `${slugBase}-${n}`;
-  }
+      .eq('slug', c);
+    return (count ?? 0) > 0;
+  });
 
   const insert: Record<string, unknown> = {
     slug,

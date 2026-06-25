@@ -2,16 +2,8 @@ import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { DOMAIN_IDS, isDomainId } from '@/lib/learn/domains';
-
-function slugify(input: string): string {
-  return input
-    .normalize('NFKD')
-    .toLowerCase()
-    .replace(/[֐-׿]/g, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 60);
-}
+import { toSlug, ensureUniqueSlug } from '@/lib/utils/slug';
+import { translateToSlug } from '@/lib/ai/slug-translate';
 
 export async function GET() {
   await requireAdmin();
@@ -38,21 +30,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'invalid_domain', allowed: DOMAIN_IDS }, { status: 400 });
   }
 
-  let slug = (body.slug ?? '').toString().trim() || slugify(name) || `cat-${Date.now()}`;
+  const provided = (body.slug ?? '').toString().trim();
+  const base = (provided ? toSlug(provided) : await translateToSlug(name)) || `cat-${Date.now()}`;
 
   const supabase = createServiceClient();
 
   // De-dup slug
-  let candidate = slug;
-  for (let n = 2; n < 50; n++) {
+  const slug = await ensureUniqueSlug(base, async (c) => {
     const { count } = await supabase
       .from('categories')
       .select('id', { count: 'exact', head: true })
-      .eq('slug', candidate);
-    if ((count ?? 0) === 0) break;
-    candidate = `${slug}-${n}`;
-  }
-  slug = candidate;
+      .eq('slug', c);
+    return (count ?? 0) > 0;
+  });
 
   const { data, error } = await supabase
     .from('categories')

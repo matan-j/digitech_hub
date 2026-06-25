@@ -1,16 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { resolveWriteActor } from '@/lib/learn/content-write';
-
-function slugify(input: string): string {
-  return input
-    .normalize('NFKD')
-    .toLowerCase()
-    .replace(/[֐-׿]/g, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 60);
-}
+import { toSlug, ensureUniqueSlug } from '@/lib/utils/slug';
+import { translateToSlug } from '@/lib/ai/slug-translate';
 
 export async function POST(request: Request) {
   const actor = await resolveWriteActor();
@@ -26,17 +18,16 @@ export async function POST(request: Request) {
 
   const supabase = await createClient();
 
-  const slugBase = (body.slug ?? '').toString().trim() || slugify(title) || `playlist-${Date.now()}`;
-  let slug = slugBase;
-  for (let n = 2; n < 50; n++) {
+  const provided = (body.slug ?? '').toString().trim();
+  const slugBase = (provided ? toSlug(provided) : await translateToSlug(title)) || `playlist-${Date.now()}`;
+  const slug = await ensureUniqueSlug(slugBase, async (c) => {
     const { count } = await supabase
       .from('playlists')
       .select('id', { count: 'exact', head: true })
       .eq('creator_id', creatorId)
-      .eq('slug', slug);
-    if ((count ?? 0) === 0) break;
-    slug = `${slugBase}-${n}`;
-  }
+      .eq('slug', c);
+    return (count ?? 0) > 0;
+  });
 
   const { data, error } = await supabase
     .from('playlists')

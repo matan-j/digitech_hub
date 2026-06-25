@@ -11,22 +11,19 @@ export async function POST(request: Request) {
   const title = (body.title ?? '').toString().trim();
   if (!title) return NextResponse.json({ error: 'title_required' }, { status: 400 });
 
-  let slug = (body.slug ?? '').toString().trim() || slugify(title);
-  if (!slug) slug = `playbook-${Date.now()}`;
+  const provided = (body.slug ?? '').toString().trim();
+  const base = (provided ? toSlug(provided) : await translateToSlug(title)) || `playbook-${Date.now()}`;
 
   const supabase = createServiceClient();
 
   // De-dup slug
-  let candidate = slug;
-  for (let n = 2; n < 50; n++) {
+  const slug = await ensureUniqueSlug(base, async (c) => {
     const { count } = await supabase
       .from('playbooks')
       .select('id', { count: 'exact', head: true })
-      .eq('slug', candidate);
-    if ((count ?? 0) === 0) break;
-    candidate = `${slug}-${n}`;
-  }
-  slug = candidate;
+      .eq('slug', c);
+    return (count ?? 0) > 0;
+  });
 
   const insert = {
     source_type: 'manual' as const,

@@ -2,19 +2,12 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import type { ContentType, GuideContentKind } from '@/lib/learn/types';
 import { resolveWriteActor, validateContentUrl, type WriteActor } from '@/lib/learn/content-write';
+import { toSlug } from '@/lib/utils/slug';
 
 const VALID_TYPES: ContentType[] = ['course', 'guide', 'bundle'];
 
 /** Normalize a user-edited slug to safe URL form (empty string if nothing usable). */
-function normalizeSlug(input: string): string {
-  return input
-    .normalize('NFKD')
-    .toLowerCase()
-    .replace(/[֐-׿]/g, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 60);
-}
+const normalizeSlug = toSlug;
 
 // Fields a creator OR admin may update.
 const BASE_FIELDS = [
