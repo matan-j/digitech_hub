@@ -10,7 +10,7 @@ import {
   markRequestWebhook,
   type ContentType,
 } from '@/lib/payments/order-service';
-import { grantEntitlement } from '@/lib/payments/entitlement-service';
+import { grantPurchaseAccess } from '@/lib/payments/entitlement-service';
 import { enrollInCourse } from '@/lib/learn/enrollment';
 import { resolveAccessLevel } from '@/lib/learn/access';
 import { isSumitConfigured, sumitBeginRedirect } from '@/lib/payments/sumit';
@@ -24,7 +24,7 @@ import { ensureSquareCoverUrl } from '@/lib/images/square-cover';
 
 export const runtime = 'nodejs';
 
-const PURCHASABLE: ContentType[] = ['course', 'guide'];
+const PURCHASABLE: ContentType[] = ['course', 'guide', 'bundle'];
 
 type PurchaseItem = {
   id: string;
@@ -108,7 +108,8 @@ export async function POST(request: Request) {
           currency: price.currency,
         }));
       await markOrderPaid(order.id, null);
-      await grantEntitlement({
+      // Expands a 'bundle' into a course entitlement per contained course (036).
+      await grantPurchaseAccess({
         userId: auth.userId,
         resourceType: contentType,
         resourceId: item.id,

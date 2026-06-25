@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import type { ContentType, GuideContentKind } from '@/lib/learn/types';
 import { resolveWriteActor, validateContentUrl, type WriteActor } from '@/lib/learn/content-write';
 
-const VALID_TYPES: ContentType[] = ['course', 'guide'];
+const VALID_TYPES: ContentType[] = ['course', 'guide', 'bundle'];
 
 /** Normalize a user-edited slug to safe URL form (empty string if nothing usable). */
 function normalizeSlug(input: string): string {
@@ -165,6 +165,25 @@ export async function PUT(request: Request, ctx: { params: Promise<{ type: strin
       const rows = desired.map((category_id) => ({ content_item_id: updated.id, category_id }));
       const { error: iErr } = await supabase.from('content_item_categories').insert(rows);
       if (iErr) console.error('[content:update:cats:insert]', iErr);
+    }
+  }
+
+  // Bundle composition — sync the contained courses (migration 036). Same
+  // delete-then-insert pattern as categories; position preserves dropdown order.
+  if (type === 'bundle' && Array.isArray(body.course_ids) && updated) {
+    const courseIds: string[] = (body.course_ids as unknown[])
+      .filter((id): id is string => typeof id === 'string' && id.length > 0);
+
+    const { error: dErr } = await supabase
+      .from('bundle_items')
+      .delete()
+      .eq('bundle_id', updated.id);
+    if (dErr) console.error('[content:update:bundle_items:delete]', dErr);
+
+    if (courseIds.length > 0) {
+      const rows = courseIds.map((course_id, i) => ({ bundle_id: updated.id, course_id, position: i }));
+      const { error: bErr } = await supabase.from('bundle_items').insert(rows);
+      if (bErr) console.error('[content:update:bundle_items:insert]', bErr);
     }
   }
 

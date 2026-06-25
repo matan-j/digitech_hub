@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import type { ContentType, GuideContentKind } from '@/lib/learn/types';
 import { resolveWriteActor, validateContentUrl } from '@/lib/learn/content-write';
 
-const VALID_TYPES: ContentType[] = ['course', 'guide'];
+const VALID_TYPES: ContentType[] = ['course', 'guide', 'bundle'];
 
 function slugify(input: string): string {
   return input

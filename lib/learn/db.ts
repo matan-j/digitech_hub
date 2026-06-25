@@ -1,5 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import type {
+  BundleCourseRef,
+  BundleWithCourses,
   ChapterWithLessons,
   ContentItem,
   ContentType,
@@ -108,6 +110,44 @@ export async function getContentBySlug(type: ContentType, slug: string): Promise
   if (!data) return null;
   const [row] = await attachContentCategories(supabase, [data as ContentItem]);
   return row;
+}
+
+/**
+ * A bundle (type='bundle' content item) plus its contained courses, in bundle
+ * order (bundle_items.position). Returns null if the slug isn't a bundle.
+ * Admin-side read (RLS-aware client) — used by the products editor.
+ */
+export async function getBundleWithCourses(slug: string): Promise<BundleWithCourses | null> {
+  const supabase = await db();
+  const { data: bundle, error } = await supabase
+    .from('content_items')
+    .select('*')
+    .eq('type', 'bundle')
+    .eq('slug', slug)
+    .maybeSingle();
+  if (error) throw error;
+  if (!bundle) return null;
+
+  const { data: links, error: lErr } = await supabase
+    .from('bundle_items')
+    .select('course_id, position')
+    .eq('bundle_id', (bundle as ContentItem).id)
+    .order('position', { ascending: true });
+  if (lErr) throw lErr;
+
+  const courseIds = (links ?? []).map((r) => (r as { course_id: string }).course_id);
+  let courses: BundleCourseRef[] = [];
+  if (courseIds.length > 0) {
+    const { data: cs } = await supabase
+      .from('content_items')
+      .select('id, slug, title, cover_url, price_amount, sale_amount, price_currency, status')
+      .in('id', courseIds);
+    const byId = new Map((cs ?? []).map((c) => [(c as BundleCourseRef).id, c as BundleCourseRef]));
+    // Preserve bundle order; drop any course that no longer exists.
+    courses = courseIds.map((id) => byId.get(id)).filter(Boolean) as BundleCourseRef[];
+  }
+
+  return { ...(bundle as ContentItem), type: 'bundle', courses };
 }
 
 export async function getContentById(id: string): Promise<ContentItem | null> {

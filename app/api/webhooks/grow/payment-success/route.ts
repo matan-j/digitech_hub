@@ -27,7 +27,7 @@ import {
   setOrderInvoice,
   validatePaymentAgainstOrder,
 } from '@/lib/payments/order-service';
-import { grantEntitlement } from '@/lib/payments/entitlement-service';
+import { grantPurchaseAccess } from '@/lib/payments/entitlement-service';
 import { clearCartItems } from '@/lib/cart/cart-service';
 import { recordRedemption, clearCartCoupon } from '@/lib/payments/coupon-service';
 import { createServiceClient } from '@/lib/supabase/server';
@@ -207,10 +207,12 @@ export async function POST(request: Request) {
   // Multi-item (cart "bundle") order → grant one entitlement per line and clear
   // exactly those items from the buyer's cart. A single-item order has no
   // order_items rows → fall back to the order's own content_id (back-compatible).
+  // grantPurchaseAccess expands a 'bundle' line into a 'course' entitlement per
+  // contained course (migration 036), so a bundle buyer unlocks every course.
   const items = await getOrderItems(order.id);
   if (items.length > 0) {
     for (const it of items) {
-      await grantEntitlement({
+      await grantPurchaseAccess({
         userId: order.user_id,
         resourceType: it.content_type,
         resourceId: it.content_id,
@@ -220,7 +222,7 @@ export async function POST(request: Request) {
     }
     await clearCartItems(order.user_id, items.map((it) => it.content_id));
   } else {
-    await grantEntitlement({
+    await grantPurchaseAccess({
       userId: order.user_id,
       resourceType: order.content_type,
       resourceId: order.content_id,

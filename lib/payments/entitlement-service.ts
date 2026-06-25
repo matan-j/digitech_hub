@@ -45,6 +45,45 @@ export async function grantEntitlement(params: {
   await supabase.from('profiles').update({ lead_status: 'purchased' }).eq('id', params.userId);
 }
 
+/**
+ * Grant access for ONE purchased line, expanding a bundle into its courses.
+ *
+ * For a plain course/guide this is just grantEntitlement(). For a 'bundle' it
+ * ALSO grants a 'course' entitlement for every course in the bundle (migration
+ * 036 bundle_items) — so the buyer immediately passes has_content_access() on
+ * each contained course. The bundle entitlement itself is kept too (for "my
+ * products" / audit). All grants are idempotent, so webhook replays are safe.
+ *
+ * Service-role only — call from verified webhooks / the server purchase flow.
+ */
+export async function grantPurchaseAccess(params: {
+  userId: string;
+  resourceType: ResourceType;
+  resourceId: string;
+  orderId?: string | null;
+  source?: 'purchase' | 'admin' | 'gift';
+}): Promise<void> {
+  await grantEntitlement(params);
+  if (params.resourceType !== 'bundle') return;
+
+  const supabase = createServiceClient();
+  const { data, error } = await supabase
+    .from('bundle_items')
+    .select('course_id')
+    .eq('bundle_id', params.resourceId);
+  if (error) throw new Error(`grantPurchaseAccess: bundle expand failed: ${error.message}`);
+
+  for (const row of data ?? []) {
+    await grantEntitlement({
+      userId: params.userId,
+      resourceType: 'course',
+      resourceId: (row as { course_id: string }).course_id,
+      orderId: params.orderId ?? null,
+      source: params.source ?? 'purchase',
+    });
+  }
+}
+
 /** Server-side check (uses the caller's RLS context). */
 export async function hasActiveEntitlement(
   resourceType: ResourceType,

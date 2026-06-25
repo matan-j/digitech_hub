@@ -42,7 +42,7 @@ export type Course = {
 // V1 (Supabase-backed) types — used by /admin/* and /api/content/*
 // ============================================================
 
-export type ContentType = 'course' | 'guide';
+export type ContentType = 'course' | 'guide' | 'bundle';
 export type ContentStatus = 'draft' | 'published' | 'archived';
 
 // ----- Public-first access model (migration 018) -----
@@ -289,6 +289,24 @@ export type CourseWithModules = ContentItem & {
 export type GuideItem = ContentItem & {
   type: 'guide';
   body: GuideBlock[];
+};
+
+// ============================================================
+// Bundle (migration 036) — a content_items row (type='bundle') that bundles a
+// fixed set of courses. Reuses the content_items pricing/access/coupon pipeline;
+// the only bundle-specific data is the contained courses (bundle_items).
+// ============================================================
+
+/** Lightweight course summary shown inside a bundle (editor + product card). */
+export type BundleCourseRef = Pick<
+  ContentItem,
+  'id' | 'slug' | 'title' | 'cover_url' | 'price_amount' | 'sale_amount' | 'price_currency' | 'status'
+>;
+
+export type BundleWithCourses = ContentItem & {
+  type: 'bundle';
+  /** Contained courses, in bundle order (bundle_items.position). */
+  courses: BundleCourseRef[];
 };
 
 export type PlaybookSourceType = 'course' | 'video' | 'manual';
