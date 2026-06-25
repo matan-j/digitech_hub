@@ -52,10 +52,16 @@ export default function CreatorEditor({ initial, users }: { initial: Creator; us
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      if (!res.ok) { setSaveState('error'); return; }
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        console.error('[creator:save]', res.status, body);
+        setSaveState('error');
+        return;
+      }
       setSaveState('saved');
       dirty.current = false;
-    } catch {
+    } catch (err) {
+      console.error('[creator:save:network]', err);
       setSaveState('error');
     }
   }, [initial.id]);

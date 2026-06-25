@@ -6,7 +6,7 @@ const MAX_BYTES = 5 * 1024 * 1024; // 5 MB — covers are bigger than logos
 const ALLOWED = new Set(['image/png', 'image/jpeg', 'image/webp']);
 
 async function requireAdminOrNull() {
-  const supa = await createClient();
+  const supa = createServiceClient();
   const { data: { user } } = await supa.auth.getUser();
   if (!user) return null;
   const { data: profile } = await supa.from('profiles').select('role').eq('id', user.id).single();

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/auth';
-import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/server';
 import { sanitizeSections } from '@/lib/learn/homepage';
 import { getHomepageConfig } from '@/lib/learn/homepage-server';
 
@@ -18,7 +18,7 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: 'no_valid_sections' }, { status: 400 });
   }
 
-  const supabase = await createClient();
+  const supabase = createServiceClient();
   const { data, error } = await supabase
     .from('homepage_config')
     .update({ sections, updated_by: admin.userId })

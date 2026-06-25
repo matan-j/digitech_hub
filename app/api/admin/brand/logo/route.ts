@@ -6,7 +6,7 @@ const MAX_BYTES = 2 * 1024 * 1024; // 2 MB
 const ALLOWED = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml']);
 
 async function requireAdminOrNull() {
-  const supa = await createClient();
+  const supa = createServiceClient();
   const { data: { user } } = await supa.auth.getUser();
   if (!user) return null;
   const { data: profile } = await supa.from('profiles').select('role').eq('id', user.id).single();

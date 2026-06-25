@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/auth';
-import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/server';
 
 const UPDATABLE_FIELDS = [
   'title',
@@ -40,7 +40,7 @@ export async function PUT(request: Request, ctx: { params: Promise<{ id: string 
     return NextResponse.json({ error: 'nothing_to_update' }, { status: 400 });
   }
 
-  const supabase = await createClient();
+  const supabase = createServiceClient();
 
   let updated;
   if (Object.keys(update).length > 0) {
@@ -84,7 +84,7 @@ export async function PUT(request: Request, ctx: { params: Promise<{ id: string 
 export async function DELETE(_request: Request, ctx: { params: Promise<{ id: string }> }) {
   await requireAdmin();
   const { id } = await ctx.params;
-  const supabase = await createClient();
+  const supabase = createServiceClient();
   const { error } = await supabase.from('playbooks').delete().eq('id', id);
   if (error) {
     return NextResponse.json({ error: 'delete_failed', message: error.message }, { status: 500 });

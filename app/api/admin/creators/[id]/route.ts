@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/auth';
-import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/server';
 
 const UPDATABLE = [
   'name',
@@ -39,7 +39,7 @@ export async function PATCH(request: Request, ctx: { params: Promise<{ id: strin
   }
   update.updated_by = profile.id;
 
-  const supabase = await createClient();
+  const supabase = createServiceClient();
   const { data, error } = await supabase.from('creators').update(update).eq('id', id).select('*').single();
   if (error) {
     console.error('[creators:update]', error);
@@ -62,7 +62,7 @@ export async function PATCH(request: Request, ctx: { params: Promise<{ id: strin
 export async function DELETE(_request: Request, ctx: { params: Promise<{ id: string }> }) {
   await requireAdmin();
   const { id } = await ctx.params;
-  const supabase = await createClient();
+  const supabase = createServiceClient();
   const { error } = await supabase.from('creators').delete().eq('id', id);
   if (error) {
     return NextResponse.json({ error: 'delete_failed', message: error.message }, { status: 500 });

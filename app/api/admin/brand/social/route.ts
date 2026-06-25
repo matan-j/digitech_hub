@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/server';
 import type { SocialKey } from '@/lib/brand';
 
 const KEYS: readonly SocialKey[] = [
@@ -27,7 +27,7 @@ function sanitize(value: unknown): string | null {
 }
 
 async function requireAdminOrNull() {
-  const supa = await createClient();
+  const supa = createServiceClient();
   const { data: { user } } = await supa.auth.getUser();
   if (!user) return null;
   const { data: profile } = await supa.from('profiles').select('role').eq('id', user.id).single();

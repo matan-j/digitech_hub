@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/auth';
-import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/server';
 
 function slugify(input: string): string {
   return input
@@ -22,7 +22,7 @@ export async function POST(request: Request) {
   let slug = (body.slug ?? '').toString().trim() || slugify(title);
   if (!slug) slug = `playbook-${Date.now()}`;
 
-  const supabase = await createClient();
+  const supabase = createServiceClient();
 
   // De-dup slug
   let candidate = slug;
