@@ -54,7 +54,9 @@ export default async function LessonPage({
   // Legacy subscription gate (is_premium / subscription_required). An active
   // per-course entitlement (purchase / admin / gift) bypasses the premium lock
   // just like a live subscription — mirroring has_content_access() in the DB.
-  if (isPremium) {
+  // Free-preview lessons (is_preview) stay open to non-subscribers, mirroring
+  // the purchase_required branch below.
+  if (isPremium && !isPreviewLesson) {
     if (!auth) redirect(`/login?return=${encodeURIComponent(returnTo)}`);
     const entitled = hasPremiumAccess(auth.profile) || (await hasActiveEntitlement('course', courseId));
     if (!entitled) {

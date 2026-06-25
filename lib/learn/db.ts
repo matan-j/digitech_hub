@@ -363,8 +363,11 @@ export async function getCourseWithModules(
  * (bulk-import, playbooks-from-course, courses.ts mapper). Flattens modules → chapters → lessons
  * in position order.
  */
-export async function getCourseWithLessons(slug: string): Promise<CourseWithLessons | null> {
-  const course = await getCourseWithModules(slug);
+export async function getCourseWithLessons(
+  slug: string,
+  opts: { source?: 'base' | 'public' } = {},
+): Promise<CourseWithLessons | null> {
+  const course = await getCourseWithModules(slug, opts);
   if (!course) return null;
 
   const flat: DbLesson[] = [];

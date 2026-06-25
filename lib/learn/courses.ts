@@ -70,8 +70,19 @@ export async function getCourse(slug: string): Promise<Course | null> {
 }
 
 export async function getLesson(courseSlug: string, lessonSlug: string) {
-  const full = await getCourseWithLessons(courseSlug);
-  if (!full) return null;
+  // Buyers / entitled / admins read the full course via the RLS-gated base
+  // tables. A non-buyer gets null here (the course row is gated) — fall back to
+  // the public views, which carry an UNLOCKED preview lesson's body + vimeo
+  // (migration 038). Only a non-hard-locked preview lesson is exposed that way;
+  // anything else returns null so the page still sends them to the locked
+  // landing. This is what lets "שיעור שלא נעול" show to someone who didn't buy.
+  let full = await getCourseWithLessons(courseSlug);
+  if (!full) {
+    const pub = await getCourseWithLessons(courseSlug, { source: 'public' });
+    const target = pub?.lessons.find((l) => l.slug === lessonSlug) ?? null;
+    if (!pub || !target || !target.is_preview || target.hard_locked) return null;
+    full = pub;
+  }
   const course = mapCourse(full);
   const idx = course.lessons.findIndex((l) => l.slug === lessonSlug);
   if (idx === -1) return null;
