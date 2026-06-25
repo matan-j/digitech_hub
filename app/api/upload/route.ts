@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { makeSquareFromUpload } from '@/lib/images/square-cover';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -70,9 +71,17 @@ export async function POST(request: Request) {
   }
 
   let publicUrl: string | null = null;
+  let squareUrl: string | null = null;
   if (bucket === 'covers') {
     const { data } = supabase.storage.from(bucket).getPublicUrl(path);
     publicUrl = data.publicUrl;
+    // Precompute the 1:1 crop used by the purchase webhook (skipped for SVG /
+    // anything sharp can't rasterise — makeSquareFromUpload returns null, and the
+    // purchase-time fallback can still generate it later).
+    if (file.type !== 'image/svg+xml') {
+      const square = await makeSquareFromUpload(buffer, path);
+      squareUrl = square?.url ?? null;
+    }
   } else {
     // Private bucket — return a signed URL valid for 1 year (resources stay private)
     const { data, error: sErr } = await supabase.storage.from(bucket).createSignedUrl(path, 60 * 60 * 24 * 365);
@@ -86,6 +95,7 @@ export async function POST(request: Request) {
     bucket,
     path,
     url: publicUrl,
+    squareUrl,
     size: file.size,
     sizeMB: Number((file.size / (1024 * 1024)).toFixed(2)),
     mime: file.type,

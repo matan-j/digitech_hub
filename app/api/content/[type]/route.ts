@@ -70,6 +70,7 @@ export async function POST(request: Request, ctx: { params: Promise<{ type: stri
     tagline: body.tagline ?? null,
     description: body.description ?? null,
     cover_url: body.cover_url ?? null,
+    cover_square_url: body.cover_square_url ?? null,
     cover_style: body.cover_style ?? 'hero',
     audience: body.audience ?? null,
     tags: body.tags ?? [],

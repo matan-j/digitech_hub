@@ -43,6 +43,7 @@ export default function CourseEditorV1({ initial }: Props) {
   const [description, setDescription] = useState(initial.description ?? '');
   const [audience, setAudience] = useState(initial.audience ?? '');
   const [coverUrl, setCoverUrl] = useState(initial.cover_url ?? '');
+  const [coverSquareUrl, setCoverSquareUrl] = useState(initial.cover_square_url ?? '');
   const [isPremium, setIsPremium] = useState(initial.is_premium);
   const [status, setStatus] = useState(initial.status);
   // Access model (migration 018)
@@ -69,6 +70,7 @@ export default function CourseEditorV1({ initial }: Props) {
     description: description || null,
     audience: audience || null,
     cover_url: coverUrl || null,
+    cover_square_url: coverSquareUrl || null,
     is_premium: isPremium,
     access_level: accessLevel,
     catalog_visibility: catalogVisibility,
@@ -77,7 +79,7 @@ export default function CourseEditorV1({ initial }: Props) {
     sale_amount: accessLevel === 'purchase_required' && saleAmount ? Number(saleAmount) : null,
     price_currency: priceCurrency,
     ...extra,
-  }), [title, tagline, description, audience, coverUrl, isPremium, accessLevel, catalogVisibility, previewEnabled, priceAmount, saleAmount, priceCurrency]);
+  }), [title, tagline, description, audience, coverUrl, coverSquareUrl, isPremium, accessLevel, catalogVisibility, previewEnabled, priceAmount, saleAmount, priceCurrency]);
 
   const persist = useCallback(async (payload: Record<string, unknown>) => {
     setSaveState('saving');
@@ -105,7 +107,7 @@ export default function CourseEditorV1({ initial }: Props) {
       persist(buildMeta());
     }, 1200);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [title, tagline, description, audience, coverUrl, isPremium, accessLevel, catalogVisibility, previewEnabled, priceAmount, saleAmount, priceCurrency]);
+  }, [title, tagline, description, audience, coverUrl, coverSquareUrl, isPremium, accessLevel, catalogVisibility, previewEnabled, priceAmount, saleAmount, priceCurrency]);
 
   useEffect(() => () => {
     if (saveTimer.current) clearTimeout(saveTimer.current);
@@ -595,7 +597,14 @@ export default function CourseEditorV1({ initial }: Props) {
               className="w-full px-3 py-2 rounded-md border border-neutral-200 focus:border-brand-purple-400 focus:outline-none text-sm"
             />
             <label className="block text-xs font-semibold text-neutral-600 mb-1 mt-4">תמונת קאבר</label>
-            <FileUpload bucket="covers" preview={coverUrl} onUploaded={(r) => setCoverUrl(r.url)} />
+            <FileUpload
+              bucket="covers"
+              preview={coverUrl}
+              onUploaded={(r) => {
+                setCoverUrl(r.url);
+                setCoverSquareUrl(r.squareUrl ?? '');
+              }}
+            />
           </div>
         </div>
       </section>

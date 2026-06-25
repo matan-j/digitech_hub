@@ -34,6 +34,7 @@ import {
   israelDateTime,
   type PurchaseWebhookPayload,
 } from '@/lib/payments/make-webhook';
+import { ensureSquareCoverUrl } from '@/lib/images/square-cover';
 
 export const runtime = 'nodejs';
 
@@ -104,17 +105,28 @@ export async function POST(request: Request) {
     })),
   );
 
+  // Resolve a pre-cropped 1:1 cover per line (cached on the item; lazily generated
+  // + stored on first use). Falls back to the original cover, never to empty.
+  const products = await Promise.all(
+    cart.items.map(async (i) => ({
+      product_name: i.title,
+      price_before_discount: i.price_before,
+      price_after_discount: i.price_after,
+      image_url:
+        (await ensureSquareCoverUrl({
+          id: i.content_id,
+          coverUrl: i.cover_url,
+          coverSquareUrl: i.cover_square_url,
+        })) ?? '',
+    })),
+  );
+
   const payload: PurchaseWebhookPayload = {
     customer_name: (profileRow?.full_name as string | null) ?? auth.profile.full_name ?? '',
     customer_email: auth.email,
     customer_phone: phone,
     current_datetime: israelDateTime(),
-    products: cart.items.map((i) => ({
-      product_name: i.title,
-      price_before_discount: i.price_before,
-      price_after_discount: i.price_after,
-      image_url: i.cover_url ?? '',
-    })),
+    products,
     public_order_id: order.public_order_id,
     user_id: auth.userId,
     content_type: 'bundle',

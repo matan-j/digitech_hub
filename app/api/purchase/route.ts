@@ -20,6 +20,7 @@ import {
   israelDateTime,
   type PurchaseWebhookPayload,
 } from '@/lib/payments/make-webhook';
+import { ensureSquareCoverUrl } from '@/lib/images/square-cover';
 
 export const runtime = 'nodejs';
 
@@ -30,6 +31,7 @@ type PurchaseItem = {
   slug: string;
   title: string | null;
   cover_url: string | null;
+  cover_square_url: string | null;
   price_amount: number | null;
   sale_amount: number | null;
   price_currency: string | null;
@@ -71,7 +73,7 @@ export async function POST(request: Request) {
   const service = createServiceClient();
   const { data: item } = await service
     .from('content_items')
-    .select('id, slug, title, cover_url, access_level, is_premium, price_amount, sale_amount, price_currency, status')
+    .select('id, slug, title, cover_url, cover_square_url, access_level, is_premium, price_amount, sale_amount, price_currency, status')
     .eq('slug', slug)
     .eq('type', contentType)
     .maybeSingle();
@@ -179,6 +181,14 @@ async function paidViaMake(
       currency: price.currency,
     }));
 
+  // Always send a pre-cropped 1:1 cover (cached on the item; lazily generated +
+  // stored here on first use). Falls back to the original cover, never to empty.
+  const squareImage = await ensureSquareCoverUrl({
+    id: item.id,
+    coverUrl: item.cover_url,
+    coverSquareUrl: item.cover_square_url,
+  });
+
   const payload: PurchaseWebhookPayload = {
     customer_name: (profileRow?.full_name as string | null) ?? auth.profile.full_name ?? '',
     customer_email: auth.email,
@@ -189,7 +199,7 @@ async function paidViaMake(
         product_name: item.title ?? item.slug,
         price_before_discount: price.original,
         price_after_discount: price.final,
-        image_url: item.cover_url ?? '',
+        image_url: squareImage ?? '',
       },
     ],
     public_order_id: order.public_order_id,

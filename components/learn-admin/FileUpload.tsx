@@ -5,6 +5,8 @@ import { Upload, X, Loader2, CheckCircle2 } from 'lucide-react';
 
 export type UploadResult = {
   url: string;
+  /** Pre-cropped 1:1 cover URL (covers bucket, raster only). Null for SVG/non-covers. */
+  squareUrl?: string | null;
   path: string;
   sizeMB: number;
   mime: string;
