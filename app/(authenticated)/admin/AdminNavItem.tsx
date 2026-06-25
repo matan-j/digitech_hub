@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, BookOpen, Compass, BookText, Users, Palette, Tags, Sparkles, UserSearch, Home, ShoppingBag, Ticket, Package } from 'lucide-react';
+import { LayoutDashboard, BookOpen, Compass, BookText, Users, Palette, Tags, Sparkles, UserSearch, Home, ShoppingBag, Ticket, Package, MessageSquare } from 'lucide-react';
 
 const NAV = [
   { href: '/admin', label: 'דאשבורד', Icon: LayoutDashboard, exact: true },
@@ -17,6 +17,7 @@ const NAV = [
   { href: '/admin/coupons', label: 'קופונים', Icon: Ticket, exact: false },
   { href: '/admin/leads', label: 'לידים ולומדים', Icon: UserSearch, exact: false },
   { href: '/admin/creators', label: 'יוצרים', Icon: Sparkles, exact: false },
+  { href: '/admin/popups', label: 'פופאפים', Icon: MessageSquare, exact: false },
   { href: '/admin/brand', label: 'מותג', Icon: Palette, exact: false },
 ] as const;
 

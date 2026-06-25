@@ -22,6 +22,7 @@ import type {
   Playlist,
 } from './types';
 import { DOMAINS, type Category, type DomainColor, type DomainMeta } from './domains';
+import type { Popup, PublicPopup } from './popups';
 
 // ============================================================
 // Reads — go through the request-scoped (RLS-aware) client
@@ -958,4 +959,76 @@ export async function adminCounts(): Promise<{
     guides: { total: guidesTotal.count ?? 0, published: guidesPublished.count ?? 0 },
     playbooks: playbooks.count ?? 0,
   };
+}
+
+// ============================================================
+// Popups (admin-managed site modals — migration 040)
+// ============================================================
+
+const PUBLIC_POPUP_COLS =
+  'id, content_type, image_url, image_link, image_link_new_tab, html, iframe_url, video_url, show_once, corner_radius, max_width, trigger_type, trigger_value, priority';
+
+/** All popups, newest-relevant first. Admin only (service client bypasses RLS). */
+export async function listAllPopups(): Promise<Popup[]> {
+  try {
+    const supabase = createServiceClient();
+    const { data, error } = await supabase
+      .from('popups')
+      .select('*')
+      .order('priority', { ascending: false })
+      .order('created_at', { ascending: false });
+    if (error) {
+      console.error('[listAllPopups]', error.message);
+      return [];
+    }
+    return (data ?? []) as Popup[];
+  } catch (err) {
+    console.error('[listAllPopups] exception:', err);
+    return [];
+  }
+}
+
+/**
+ * Popups eligible to show on `path` right now. Filters enabled + schedule
+ * window + scope, plus the logged-in gate. Ordered by priority so the renderer
+ * can show the single top one. Uses the service client and filters explicitly
+ * (the public RLS floor already hides disabled rows, but we re-check here).
+ */
+export async function getActivePopupsForPath(
+  path: string,
+  isLoggedIn: boolean,
+  nowIso: string,
+): Promise<PublicPopup[]> {
+  try {
+    const supabase = createServiceClient();
+    let query = supabase
+      .from('popups')
+      .select(`${PUBLIC_POPUP_COLS}, starts_at, ends_at`)
+      .eq('enabled', true)
+      .order('priority', { ascending: false });
+
+    // scope: whole-site OR this exact path
+    query = query.or(`scope.eq.all,and(scope.eq.page,target_path.eq.${path})`);
+
+    if (!isLoggedIn) query = query.eq('logged_in_only', false);
+
+    const { data, error } = await query;
+    if (error) {
+      console.error('[getActivePopupsForPath]', error.message);
+      return [];
+    }
+
+    const now = new Date(nowIso).getTime();
+    // schedule window must be filtered in JS (null = open-ended).
+    return ((data ?? []) as (PublicPopup & { starts_at?: string | null; ends_at?: string | null })[])
+      .filter((p) => {
+        const startOk = !p.starts_at || new Date(p.starts_at).getTime() <= now;
+        const endOk = !p.ends_at || new Date(p.ends_at).getTime() >= now;
+        return startOk && endOk;
+      })
+      .map(({ ...p }) => p as PublicPopup);
+  } catch (err) {
+    console.error('[getActivePopupsForPath] exception:', err);
+    return [];
+  }
 }

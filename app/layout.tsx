@@ -3,6 +3,7 @@ import { Rubik, Space_Grotesk } from 'next/font/google';
 import './globals.css';
 import CartProvider from '@/components/cart/CartProvider';
 import MiniCart from '@/components/cart/MiniCart';
+import PopupRenderer from '@/components/popups/PopupRenderer';
 
 const rubik = Rubik({
   subsets: ['hebrew', 'latin'],
@@ -38,6 +39,7 @@ export default function RootLayout({
           {children}
           <MiniCart />
         </CartProvider>
+        <PopupRenderer />
       </body>
     </html>
   );
