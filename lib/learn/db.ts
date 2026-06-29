@@ -971,7 +971,7 @@ export async function adminCounts(): Promise<{
 // ============================================================
 
 const PUBLIC_POPUP_COLS =
-  'id, content_type, image_url, image_link, image_link_new_tab, html, iframe_url, video_url, show_once, corner_radius, max_width, trigger_type, trigger_value, priority';
+  'id, content_type, image_url, image_link, image_link_new_tab, image_link_auth, html, iframe_url, video_url, show_once, corner_radius, max_width, trigger_type, trigger_value, priority';
 
 /** All popups, newest-relevant first. Admin only (service client bypasses RLS). */
 export async function listAllPopups(): Promise<Popup[]> {

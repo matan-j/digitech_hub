@@ -182,15 +182,32 @@ export default function PopupEditor({
                   </button>
                 </div>
                 <div>
-                  <label className={labelCls}>קישור בלחיצה על התמונה (אופציונלי)</label>
+                  <label className={labelCls}>פעולה בלחיצה על התמונה</label>
+
+                  <label className="flex items-start gap-2.5 text-sm text-neutral-700 mb-3">
+                    <input
+                      type="checkbox"
+                      className="mt-0.5"
+                      checked={d.image_link_auth}
+                      onChange={(e) => set('image_link_auth', e.target.checked)}
+                    />
+                    <span>
+                      פתח חלון הרשמה / התחברות בלחיצה
+                      <span className="block text-xs text-neutral-400">
+                        מוצג רק למשתמשים שאינם מחוברים. מחליף את הקישור למטה.
+                      </span>
+                    </span>
+                  </label>
+
                   <input
-                    className={inputCls}
+                    className={`${inputCls} ${d.image_link_auth ? 'opacity-50' : ''}`}
                     value={d.image_link ?? ''}
                     onChange={(e) => set('image_link', e.target.value || null)}
-                    placeholder="https://..."
+                    placeholder="קישור בלחיצה (אופציונלי) — https://..."
                     dir="ltr"
+                    disabled={d.image_link_auth}
                   />
-                  {d.image_link && (
+                  {d.image_link && !d.image_link_auth && (
                     <label className="flex items-center gap-2 mt-2 text-sm text-neutral-600">
                       <input
                         type="checkbox"

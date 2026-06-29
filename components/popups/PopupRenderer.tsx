@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
+import { createClient } from '@/lib/supabase/client';
 import { popupSeenKey, type PublicPopup } from '@/lib/learn/popups';
 import { PopupModal } from './PopupView';
+import AccessModal, { type AccessRequest } from '@/components/auth/AccessModal';
 
 /**
  * Global popup host. Mounted once in the root layout. Fetches the popups
@@ -14,6 +16,25 @@ import { PopupModal } from './PopupView';
 export default function PopupRenderer() {
   const pathname = usePathname();
   const [active, setActive] = useState<PublicPopup | null>(null);
+  // Auth state (for `image_link_auth` popups) + the registration/login modal.
+  const [authed, setAuthed] = useState<boolean | null>(null);
+  const [authRequest, setAuthRequest] = useState<AccessRequest | null>(null);
+
+  // Track login state so we only wire the auth-image click for logged-out users.
+  useEffect(() => {
+    const supabase = createClient();
+    let alive = true;
+    supabase.auth.getSession().then(({ data }) => {
+      if (alive) setAuthed(Boolean(data.session));
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
+      setAuthed(Boolean(session));
+    });
+    return () => {
+      alive = false;
+      sub.subscription.unsubscribe();
+    };
+  }, []);
 
   useEffect(() => {
     // Don't run inside the admin / CMS areas.
@@ -88,6 +109,30 @@ export default function PopupRenderer() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
-  if (!active) return null;
-  return <PopupModal popup={active} onClose={() => setActive(null)} />;
+  // Only wire the auth-image click for logged-out visitors; a logged-in user
+  // sees a plain image (the action is "register / log in").
+  const onAuthAction =
+    active?.image_link_auth && authed === false
+      ? () => {
+          setActive(null); // close the popup; AccessModal takes over
+          setAuthRequest({ action: 'popup_cta', returnTo: pathname });
+        }
+      : undefined;
+
+  return (
+    <>
+      {active && (
+        <PopupModal
+          popup={active}
+          onClose={() => setActive(null)}
+          onAuthAction={onAuthAction}
+        />
+      )}
+      <AccessModal
+        open={authRequest !== null}
+        request={authRequest}
+        onClose={() => setAuthRequest(null)}
+      />
+    </>
+  );
 }

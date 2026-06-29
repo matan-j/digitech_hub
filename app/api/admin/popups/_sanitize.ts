@@ -50,6 +50,7 @@ export function sanitizePopup(body: Record<string, unknown>, partial: boolean): 
   set('image_url', str(body.image_url));
   set('image_link', str(body.image_link));
   set('image_link_new_tab', bool(body.image_link_new_tab, true));
+  set('image_link_auth', bool(body.image_link_auth));
   set('html', str(body.html));
   set('iframe_url', str(body.iframe_url));
   set('video_url', str(body.video_url));

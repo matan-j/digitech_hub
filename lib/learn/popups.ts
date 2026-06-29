@@ -14,6 +14,8 @@ export type Popup = {
   image_url: string | null;
   image_link: string | null;
   image_link_new_tab: boolean;
+  /** When true, clicking the image opens the registration/login modal (ignores image_link). */
+  image_link_auth: boolean;
   html: string | null;
   iframe_url: string | null;
   video_url: string | null;
@@ -48,6 +50,7 @@ export type PublicPopup = Pick<
   | 'image_url'
   | 'image_link'
   | 'image_link_new_tab'
+  | 'image_link_auth'
   | 'html'
   | 'iframe_url'
   | 'video_url'
@@ -84,6 +87,7 @@ export const NEW_POPUP_DEFAULTS = {
   image_url: null,
   image_link: null,
   image_link_new_tab: true,
+  image_link_auth: false,
   html: null,
   iframe_url: null,
   video_url: null,
