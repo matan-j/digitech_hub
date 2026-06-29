@@ -1,7 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { ChevronDown, ChevronUp, GripVertical, Trash2, Plus, ExternalLink, FileText, FolderInput } from 'lucide-react';
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
+import { ChevronDown, ChevronUp, GripVertical, Trash2, Plus, ExternalLink, FileText } from 'lucide-react';
 import VimeoField from './VimeoField';
 import MarkdownEditor from './MarkdownEditor';
 import FileUpload from './FileUpload';
@@ -109,7 +109,6 @@ export default function NodeEditor(props: Props) {
   const [body, setBody] = useState(node.body ?? '');
   const [resources, setResources] = useState<DbResource[]>(node.resources ?? []);
   const [saveBadge, setSaveBadge] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
-  const [moveOpen, setMoveOpen] = useState(false);
   const initialMount = useRef(true);
   const saveTimer = useRef<NodeJS.Timeout | null>(null);
 
@@ -217,31 +216,6 @@ export default function NodeEditor(props: Props) {
         {kind === 'lesson' && (
           <GeneratePlaybookButton mode="video" lessonId={node.id} lessonTitle={node.title} />
         )}
-        {props.kind === 'lesson' && props.availableTargets && props.availableTargets.length > 0 && (
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setMoveOpen((v) => !v)}
-              className="p-1 text-neutral-500 hover:text-brand-purple-700"
-              aria-label="העבר ל..."
-              title="העבר למודול / פרק אחר"
-            >
-              <FolderInput className="w-4 h-4" />
-            </button>
-            {moveOpen && (
-              <MoveDropdown
-                targets={props.availableTargets}
-                currentModuleId={(props.node as DbLesson).module_id}
-                currentChapterId={(props.node as DbLesson).chapter_id}
-                onSelect={(target) => {
-                  setMoveOpen(false);
-                  props.onMove?.(target);
-                }}
-                onClose={() => setMoveOpen(false)}
-              />
-            )}
-          </div>
-        )}
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
@@ -262,6 +236,31 @@ export default function NodeEditor(props: Props) {
 
       {open && (
         <div className="p-4 space-y-4">
+          {props.kind === 'lesson' && props.availableTargets && props.availableTargets.length > 0 && (
+            <div>
+              <label className="block text-xs font-semibold text-neutral-600 mb-1">שיוך למודול / פרק</label>
+              <select
+                value={`${(props.node as DbLesson).module_id}:::${(props.node as DbLesson).chapter_id ?? ''}`}
+                onChange={(e) => {
+                  const [moduleId, chapterId] = e.target.value.split(':::');
+                  props.onMove?.({ moduleId, chapterId: chapterId || null });
+                }}
+                className="w-full px-3 py-2 rounded-md border border-neutral-200 focus:border-brand-purple-400 focus:outline-none text-sm bg-white"
+              >
+                {props.availableTargets.map((t) => (
+                  <Fragment key={t.moduleId}>
+                    <option value={`${t.moduleId}:::`}>מודול {t.moduleNum}: {t.moduleTitle}</option>
+                    {t.chapters.map((c) => (
+                      <option key={c.chapterId} value={`${t.moduleId}:::${c.chapterId}`}>
+                        ↳ פרק {c.chapterNum}: {c.chapterTitle}
+                      </option>
+                    ))}
+                  </Fragment>
+                ))}
+              </select>
+            </div>
+          )}
+
           <div className="grid sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-semibold text-neutral-600 mb-1">סרטון Vimeo (אופציונלי)</label>
@@ -339,75 +338,3 @@ export default function NodeEditor(props: Props) {
 }
 
 export type { NodeBase };
-
-function MoveDropdown({
-  targets,
-  currentModuleId,
-  currentChapterId,
-  onSelect,
-  onClose,
-}: {
-  targets: MoveTarget[];
-  currentModuleId: string;
-  currentChapterId: string | null;
-  onSelect: (target: { moduleId: string; chapterId: string | null }) => void;
-  onClose: () => void;
-}) {
-  // Close on outside click
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    function handler(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
-    }
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [onClose]);
-
-  return (
-    <div
-      ref={ref}
-      className="absolute end-0 top-full mt-1 z-30 w-72 max-h-96 overflow-y-auto bg-white border border-neutral-200 rounded-lg shadow-lg p-2 text-sm"
-    >
-      <div className="px-2 py-1 text-[11px] text-neutral-500 uppercase font-semibold">העבר ל...</div>
-      {targets.map((t) => {
-        const isCurrentDirect = t.moduleId === currentModuleId && currentChapterId === null;
-        return (
-          <div key={t.moduleId} className="mb-1">
-            <button
-              type="button"
-              disabled={isCurrentDirect}
-              onClick={() => onSelect({ moduleId: t.moduleId, chapterId: null })}
-              className={`w-full text-start px-2 py-1.5 rounded text-sm font-semibold ${
-                isCurrentDirect
-                  ? 'text-neutral-400 cursor-default'
-                  : 'text-brand-purple-800 hover:bg-brand-purple-50'
-              }`}
-            >
-              מודול {t.moduleNum}: {t.moduleTitle}
-              {isCurrentDirect && <span className="ms-2 text-[10px] text-neutral-400">(כאן)</span>}
-            </button>
-            {t.chapters.map((c) => {
-              const isCurrentChapter = c.chapterId === currentChapterId;
-              return (
-                <button
-                  key={c.chapterId}
-                  type="button"
-                  disabled={isCurrentChapter}
-                  onClick={() => onSelect({ moduleId: t.moduleId, chapterId: c.chapterId })}
-                  className={`w-full text-start ps-6 pe-2 py-1 rounded text-xs ${
-                    isCurrentChapter
-                      ? 'text-neutral-400 cursor-default'
-                      : 'text-neutral-700 hover:bg-brand-purple-50'
-                  }`}
-                >
-                  ↳ פרק {c.chapterNum}: {c.chapterTitle}
-                  {isCurrentChapter && <span className="ms-2 text-[10px] text-neutral-400">(כאן)</span>}
-                </button>
-              );
-            })}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
