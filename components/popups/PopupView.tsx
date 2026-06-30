@@ -49,13 +49,30 @@ export function PopupContent({
       }
       // eslint-disable-next-line @next/next/no-img-element
       const img = <img src={popup.image_url} alt="" className="block w-full h-auto" />;
-      // Inline registration form docked beneath the image — highest precedence.
+      // Inline registration form — highest precedence. Layout responds to the
+      // popup's own width (container query, not viewport): when the card is wide
+      // the graphic sits on the right and the form on the left (RTL → the image,
+      // as the first child, lands on the right); when narrow it stacks with the
+      // image on top and the form below.
       if (popup.image_signup_form && signupRequest) {
         return (
-          <div className="block">
-            {img}
-            <div className="border-t border-neutral-100 p-6 sm:p-7">
-              <AccessForm request={signupRequest} />
+          <div className="@container">
+            <div className="flex flex-col @2xl:flex-row">
+              {/* Graphic — top on mobile / right on desktop */}
+              <div className="bg-neutral-50 @2xl:w-1/2 @2xl:shrink-0">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={popup.image_url}
+                  alt=""
+                  className="block w-full h-auto @2xl:h-full @2xl:object-cover"
+                />
+              </div>
+              {/* Form — bottom on mobile / left on desktop */}
+              <div className="flex items-center border-t border-neutral-100 p-6 sm:p-7 @2xl:w-1/2 @2xl:border-t-0 @2xl:border-r">
+                <div className="w-full">
+                  <AccessForm request={signupRequest} />
+                </div>
+              </div>
             </div>
           </div>
         );
