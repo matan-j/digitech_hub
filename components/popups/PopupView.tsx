@@ -199,33 +199,36 @@ export function PopupModal({
       onClick={handleClose}
       className={[
         embedded ? 'absolute' : 'fixed',
-        'inset-0 z-[9999] flex items-center justify-center p-4 transition-opacity duration-200',
+        'inset-0 z-[9999] overflow-y-auto transition-opacity duration-200',
         visible ? 'opacity-100' : 'opacity-0',
       ].join(' ')}
       style={{ backgroundColor: 'rgba(15, 12, 30, 0.55)' }}
     >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className={[
-          'relative bg-white overflow-hidden shadow-2xl w-full transition-all duration-200',
-          visible ? 'scale-100' : 'scale-95',
-        ].join(' ')}
-        style={{
-          maxWidth: `${popup.max_width}px`,
-          borderRadius: `${popup.corner_radius}px`,
-          maxHeight: '90vh',
-          overflowY: 'auto',
-        }}
-      >
-        <button
-          type="button"
-          onClick={handleClose}
-          aria-label="סגירה"
-          className="absolute top-3 left-3 z-10 flex items-center justify-center w-9 h-9 rounded-full bg-white/85 hover:bg-white text-neutral-700 hover:text-neutral-950 shadow-md transition-colors"
+      {/* min-h-full + items-center: short popups center; tall ones start near
+          the top and scroll the overlay (not an inner box) — comfortable on
+          mobile, never clipped/locked. The padding keeps a little top spacing. */}
+      <div className="flex min-h-full items-center justify-center px-4 py-6 sm:py-8">
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className={[
+            'relative bg-white overflow-hidden shadow-2xl w-full transition-transform duration-200',
+            visible ? 'scale-100' : 'scale-95',
+          ].join(' ')}
+          style={{
+            maxWidth: `${popup.max_width}px`,
+            borderRadius: `${popup.corner_radius}px`,
+          }}
         >
-          <X className="w-5 h-5" />
-        </button>
-        <PopupContent popup={popup} onAuthAction={onAuthAction} signupRequest={signupRequest} />
+          <button
+            type="button"
+            onClick={handleClose}
+            aria-label="סגירה"
+            className="absolute top-3 left-3 z-10 flex items-center justify-center w-9 h-9 rounded-full bg-white/85 hover:bg-white text-neutral-700 hover:text-neutral-950 shadow-md transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
+          <PopupContent popup={popup} onAuthAction={onAuthAction} signupRequest={signupRequest} />
+        </div>
       </div>
     </div>
   );

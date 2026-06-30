@@ -4,7 +4,7 @@
 
 export type PopupContentType = 'image' | 'html' | 'iframe' | 'video' | 'rich_text';
 export type PopupTriggerType = 'scroll' | 'time';
-export type PopupScope = 'all' | 'page';
+export type PopupScope = 'all' | 'page' | 'all_except';
 
 export type Popup = {
   id: string;
@@ -33,7 +33,8 @@ export type Popup = {
   trigger_value: number;
 
   scope: PopupScope;
-  target_path: string | null;
+  target_path: string | null;       // scope = 'page'
+  excluded_paths: string[];          // scope = 'all_except'
 
   priority: number;
 
@@ -81,6 +82,27 @@ export const POPUP_TRIGGER_TYPES: { value: PopupTriggerType; label: string }[] =
 export const POPUP_SCOPES: { value: PopupScope; label: string }[] = [
   { value: 'all', label: 'כל האתר' },
   { value: 'page', label: 'עמוד ספציפי' },
+  { value: 'all_except', label: 'כל האתר חוץ מ-' },
+];
+
+/**
+ * Curated list of public pages an admin can target from a dropdown / checklist.
+ * Values are exact pathnames (as returned by usePathname). Dynamic pages
+ * (a specific course / bundle / guide) aren't listed — for those, the "specific
+ * page" mode also accepts a custom path typed by hand.
+ */
+export const POPUP_PAGES: { value: string; label: string }[] = [
+  { value: '/', label: 'דף הבית' },
+  { value: '/pricing', label: 'תמחור / מנויים' },
+  { value: '/upgrade', label: 'שדרוג' },
+  { value: '/learn', label: 'אזור הלמידה — בית' },
+  { value: '/learn/bundles', label: 'חבילות' },
+  { value: '/learn/courses', label: 'קורסים' },
+  { value: '/learn/guides', label: 'מדריכים' },
+  { value: '/learn/creators', label: 'יוצרים' },
+  { value: '/learn/playbooks', label: 'פלייבוקים' },
+  { value: '/learn/playlists', label: 'רשימות השמעה' },
+  { value: '/learn/account', label: 'החשבון שלי' },
 ];
 
 /** Defaults for a brand-new popup in the admin form. */
@@ -104,6 +126,7 @@ export const NEW_POPUP_DEFAULTS = {
   trigger_value: 5,
   scope: 'all' as PopupScope,
   target_path: null,
+  excluded_paths: [] as string[],
   priority: 0,
   starts_at: null,
   ends_at: null,

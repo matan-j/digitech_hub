@@ -112,7 +112,11 @@ export default function PopupsManager({ initialPopups }: { initialPopups: Popup[
                       </span>
                       <span className="inline-flex items-center gap-1.5 text-xs text-neutral-400">
                         <Globe className="w-3 h-3" />
-                        {p.scope === 'all' ? 'כל האתר' : p.target_path}
+                        {p.scope === 'all'
+                          ? 'כל האתר'
+                          : p.scope === 'all_except'
+                            ? `כל האתר חוץ מ-${(p.excluded_paths ?? []).length} עמודים`
+                            : p.target_path}
                       </span>
                     </div>
                   </td>

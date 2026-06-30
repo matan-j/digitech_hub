@@ -37,8 +37,10 @@ export default function PopupRenderer() {
   }, []);
 
   useEffect(() => {
-    // Don't run inside the admin / CMS areas.
-    if (pathname.startsWith('/admin') || pathname.startsWith('/cms')) return;
+    // Never show popups inside admin/CMS areas or on the auth pages
+    // (login/logout/callback) — a signup popup on the login page makes no sense.
+    const HIDDEN_PREFIXES = ['/admin', '/cms', '/login', '/logout', '/auth'];
+    if (HIDDEN_PREFIXES.some((pre) => pathname.startsWith(pre))) return;
 
     let alive = true;
     const timers: ReturnType<typeof setTimeout>[] = [];

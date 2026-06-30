@@ -3,7 +3,7 @@ import type { PopupContentType, PopupScope, PopupTriggerType } from '@/lib/learn
 
 const CONTENT_TYPES: PopupContentType[] = ['image', 'html', 'iframe', 'video', 'rich_text'];
 const TRIGGER_TYPES: PopupTriggerType[] = ['scroll', 'time'];
-const SCOPES: PopupScope[] = ['all', 'page'];
+const SCOPES: PopupScope[] = ['all', 'page', 'all_except'];
 
 function str(v: unknown): string | null {
   if (typeof v !== 'string') return null;
@@ -13,6 +13,13 @@ function str(v: unknown): string | null {
 
 function bool(v: unknown, fallback = false): boolean {
   return typeof v === 'boolean' ? v : fallback;
+}
+
+/** Clean array of non-empty path strings (deduped). */
+function strArray(v: unknown): string[] {
+  if (!Array.isArray(v)) return [];
+  const out = v.map(str).filter((s): s is string => s !== null);
+  return Array.from(new Set(out));
 }
 
 function clampInt(v: unknown, min: number, max: number, fallback: number): number {
@@ -72,6 +79,7 @@ export function sanitizePopup(body: Record<string, unknown>, partial: boolean): 
   const sc = SCOPES.includes(body.scope as PopupScope) ? (body.scope as PopupScope) : 'all';
   set('scope', sc);
   set('target_path', str(body.target_path));
+  set('excluded_paths', strArray(body.excluded_paths));
 
   set('priority', clampInt(body.priority, -1000, 1000, 0));
   set('starts_at', isoOrNull(body.starts_at));

@@ -6,6 +6,7 @@ import {
   POPUP_CONTENT_TYPES,
   POPUP_TRIGGER_TYPES,
   POPUP_SCOPES,
+  POPUP_PAGES,
   NEW_POPUP_DEFAULTS,
   type Popup,
   type PopupContentType,
@@ -211,7 +212,11 @@ export default function PopupEditor({
                       onChange={(e) => {
                         const v = e.target.checked;
                         set('image_signup_form', v);
-                        if (v) set('image_link_auth', false);
+                        if (v) {
+                          set('image_link_auth', false);
+                          // The form is logged-out-only, so "logged-in only" would conflict.
+                          set('logged_in_only', false);
+                        }
                       }}
                     />
                     <span>
@@ -364,20 +369,75 @@ export default function PopupEditor({
                 ))}
               </select>
               {d.scope === 'page' && (
-                <input
-                  className={`${inputCls} mt-2`}
-                  dir="ltr"
-                  value={d.target_path ?? ''}
-                  onChange={(e) => set('target_path', e.target.value || null)}
-                  placeholder="/learn/bundles"
-                />
+                <div className="mt-2 space-y-2">
+                  <select
+                    className={inputCls}
+                    dir="ltr"
+                    value={POPUP_PAGES.some((p) => p.value === d.target_path) ? d.target_path ?? '' : ''}
+                    onChange={(e) => set('target_path', e.target.value || null)}
+                  >
+                    <option value="">— בחר עמוד —</option>
+                    {POPUP_PAGES.map((p) => (
+                      <option key={p.value} value={p.value}>
+                        {p.label} ({p.value})
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    className={inputCls}
+                    dir="ltr"
+                    value={d.target_path ?? ''}
+                    onChange={(e) => set('target_path', e.target.value || null)}
+                    placeholder="או נתיב מותאם — /learn/courses/my-course"
+                  />
+                </div>
+              )}
+
+              {d.scope === 'all_except' && (
+                <div className="mt-2 rounded-md border border-neutral-200 p-3">
+                  <p className="text-xs text-neutral-500 mb-2">בחר עמודים שבהם הפופאפ לא יוצג:</p>
+                  <div className="space-y-1.5 max-h-52 overflow-y-auto">
+                    {POPUP_PAGES.map((p) => {
+                      const checked = (d.excluded_paths ?? []).includes(p.value);
+                      return (
+                        <label key={p.value} className="flex items-center gap-2.5 text-sm text-neutral-700">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={(e) => {
+                              const cur = d.excluded_paths ?? [];
+                              set(
+                                'excluded_paths',
+                                e.target.checked ? [...cur, p.value] : cur.filter((x) => x !== p.value),
+                              );
+                            }}
+                          />
+                          <span>
+                            {p.label} <span className="text-neutral-400" dir="ltr">{p.value}</span>
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
               )}
             </div>
 
             <div className="space-y-2.5 pt-1">
-              <label className="flex items-center gap-2.5 text-sm text-neutral-700">
-                <input type="checkbox" checked={d.logged_in_only} onChange={(e) => set('logged_in_only', e.target.checked)} />
+              <label
+                className={`flex items-center gap-2.5 text-sm ${d.image_signup_form ? 'text-neutral-400' : 'text-neutral-700'}`}
+                title={d.image_signup_form ? 'מושבת — טופס הרשמה צמוד מוצג רק למשתמשים שאינם מחוברים' : undefined}
+              >
+                <input
+                  type="checkbox"
+                  checked={d.logged_in_only && !d.image_signup_form}
+                  disabled={d.image_signup_form}
+                  onChange={(e) => set('logged_in_only', e.target.checked)}
+                />
                 למשתמשים מחוברים בלבד
+                {d.image_signup_form && (
+                  <span className="text-xs text-neutral-400">(לא רלוונטי עם טופס הרשמה צמוד)</span>
+                )}
               </label>
               <label className="flex items-center gap-2.5 text-sm text-neutral-700">
                 <input type="checkbox" checked={d.show_once} onChange={(e) => set('show_once', e.target.checked)} />

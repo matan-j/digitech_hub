@@ -22,7 +22,7 @@ import type {
   Playlist,
 } from './types';
 import { DOMAINS, type Category, type DomainColor, type DomainMeta } from './domains';
-import type { Popup, PublicPopup } from './popups';
+import type { Popup, PublicPopup, PopupScope } from './popups';
 import type {
   RegistrationRule,
   RegistrationRuleGrant,
@@ -1008,14 +1008,16 @@ export async function getActivePopupsForPath(
     const supabase = createServiceClient();
     let query = supabase
       .from('popups')
-      .select(`${PUBLIC_POPUP_COLS}, starts_at, ends_at`)
+      .select(`${PUBLIC_POPUP_COLS}, scope, target_path, excluded_paths, starts_at, ends_at`)
       .eq('enabled', true)
       .order('priority', { ascending: false });
 
-    // scope: whole-site OR this exact path
-    query = query.or(`scope.eq.all,and(scope.eq.page,target_path.eq.${path})`);
-
-    if (!isLoggedIn) query = query.eq('logged_in_only', false);
+    if (isLoggedIn) {
+      // Signup-form popups are logged-out-only by nature — hide from members.
+      query = query.eq('image_signup_form', false);
+    } else {
+      query = query.eq('logged_in_only', false);
+    }
 
     const { data, error } = await query;
     if (error) {
@@ -1024,14 +1026,26 @@ export async function getActivePopupsForPath(
     }
 
     const now = new Date(nowIso).getTime();
-    // schedule window must be filtered in JS (null = open-ended).
-    return ((data ?? []) as (PublicPopup & { starts_at?: string | null; ends_at?: string | null })[])
+    type Row = PublicPopup & {
+      scope?: PopupScope;
+      target_path?: string | null;
+      excluded_paths?: string[] | null;
+      starts_at?: string | null;
+      ends_at?: string | null;
+    };
+    // Schedule window + path targeting are filtered here (null = open-ended).
+    return ((data ?? []) as Row[])
       .filter((p) => {
         const startOk = !p.starts_at || new Date(p.starts_at).getTime() <= now;
         const endOk = !p.ends_at || new Date(p.ends_at).getTime() >= now;
-        return startOk && endOk;
+        if (!startOk || !endOk) return false;
+        if (p.scope === 'page') return p.target_path === path;
+        if (p.scope === 'all_except') return !(p.excluded_paths ?? []).includes(path);
+        return true; // 'all' (and any unexpected value → treat as site-wide)
       })
-      .map(({ ...p }) => p as PublicPopup);
+      // Strip admin-only targeting/scheduling fields before returning.
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      .map(({ scope: _s, target_path: _t, excluded_paths: _e, starts_at: _st, ends_at: _en, ...pub }) => pub as PublicPopup);
   } catch (err) {
     console.error('[getActivePopupsForPath] exception:', err);
     return [];
